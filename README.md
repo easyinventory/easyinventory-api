@@ -27,6 +27,23 @@ FastAPI backend for the EasyInventory inventory management platform.
 | `make lint`        | Check formatting (black) + types (mypy)|
 | `make format-fix`  | Auto-fix formatting with black         |
 | `make typecheck`   | Run mypy type checks                   |
+
+## Database
+
+| Command | What it does |
+|---|---|
+| `alembic upgrade head` | Run all pending migrations |
+| `alembic revision --autogenerate -m "description"` | Generate a new migration |
+| `alembic downgrade -1` | Rollback last migration |
+| `alembic history` | Show migration history |
+
+To run migrations inside Docker:
+
+    `docker compose exec api alembic upgrade head`
+
+To connect to the database directly:
+
+    `docker compose exec db psql -U postgres -d easyinventory`
  
 ## Local Dev Without Docker
  
