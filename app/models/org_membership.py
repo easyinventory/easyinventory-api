@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import uuid
 from datetime import datetime
 
@@ -6,6 +10,10 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
+
+if TYPE_CHECKING:
+    from app.models.organization import Organization
+    from app.models.user import User
 
 
 class OrgMembership(BaseModel):
@@ -30,7 +38,7 @@ class OrgMembership(BaseModel):
     )
 
     # Relationships
-    user: Mapped["User"] = relationship(back_populates="memberships", lazy="selectin")
-    organization: Mapped["Organization"] = relationship(
+    user: Mapped[User] = relationship(back_populates="memberships", lazy="selectin")
+    organization: Mapped[Organization] = relationship(
         back_populates="memberships", lazy="selectin"
     )

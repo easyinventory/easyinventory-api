@@ -1,7 +1,14 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
+
+if TYPE_CHECKING:
+    from app.models.org_membership import OrgMembership
 
 
 class User(BaseModel):
@@ -17,6 +24,6 @@ class User(BaseModel):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     # Relationships (loaded when needed)
-    memberships: Mapped[list["OrgMembership"]] = relationship(
+    memberships: Mapped[list[OrgMembership]] = relationship(
         back_populates="user", lazy="selectin"
     )
