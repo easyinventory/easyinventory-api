@@ -4,17 +4,34 @@ FastAPI backend for the EasyInventory inventory management platform.
 
 ## Prerequisites
 
-- Docker and Docker Compose
-- Python 3.11+ (for local dev without Docker)
+- [Git](https://git-scm.com/downloads) installed
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
+- [Python 3.11+](https://www.python.org/downloads/) (for local dev without Docker)
 
-## Quick Start
+## Quick Start (Docker — Recommended)
 
-1. Clone the repo
-2. `cp .env.example .env`
-3. `docker compose up --build`
-4. Run migrations: `docker compose exec api alembic upgrade head`
-5. API: http://localhost:8000
-6. Docs: http://localhost:8000/docs
+```bash
+# 1. Clone the repository
+git clone https://github.com/your-org/easyinventory-api.git
+cd easyinventory-api
+
+# 2. Create your environment file from the example
+cp .env.example .env
+
+# 3. Build and start all services (API + Postgres)
+docker compose up --build
+
+# 4. In a separate terminal, run database migrations
+docker compose exec api alembic upgrade head
+
+# 5. Verify everything is working
+curl http://localhost:8000/health
+# → {"status": "healthy", "service": "easyinventory-api"}
+```
+
+- **API:** http://localhost:8000
+- **Swagger Docs:** http://localhost:8000/docs
+- **ReDoc:** http://localhost:8000/redoc
 
 ## Health Check
 
@@ -69,19 +86,51 @@ only resolves inside the Docker network.
 
 ## Local Dev Without Docker
 
-If you prefer running the API directly on your machine (Postgres must
-still be running via Docker or locally):
+Use this if you want to run the API directly on your machine.
+You still need PostgreSQL running (via Docker or installed locally).
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements-dev.txt
+# 1. Clone the repository (skip if already done)
+git clone https://github.com/your-org/easyinventory-api.git
+cd easyinventory-api
 
-# Update DATABASE_URL in .env to use localhost instead of db
-# DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/easyinventory
+# 2. Create a Python virtual environment
+python -m venv venv
 
+# 3. Activate the virtual environment
+source venv/bin/activate        # macOS / Linux
+# venv\Scripts\activate          # Windows
+
+# 4. Install all dependencies (app + dev tools)
+pip install -r dev-requirements.txt
+
+# 5. Create your environment file
+cp .env.example .env
+
+# 6. Update DATABASE_URL in .env to point to localhost (not "db")
+#    DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/easyinventory
+
+# 7. Start Postgres via Docker (if not already running)
+docker run -d --name easyinventory-db \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=easyinventory \
+  -p 5432:5432 \
+  postgres:16
+
+# 8. Run database migrations
+python -m alembic upgrade head
+
+# 9. Start the development server
 uvicorn app.main:app --reload
+
+# 10. Verify everything is working
+curl http://localhost:8000/health
+# → {"status": "healthy", "service": "easyinventory-api"}
 ```
+
+> **Tip:** Every time you open a new terminal, re-activate the virtual
+> environment with `source venv/bin/activate` before running commands.
 
 ## Project Structure
 
@@ -129,3 +178,45 @@ feature branch (S1-XX/description)
 ```
 
 All PRs require 1 approval + passing CI (black, mypy, pytest).
+
+
+---
+ 
+## Commit Message Convention
+ 
+Use this format for every commit:
+ 
+```
+<type>: <short description>
+ 
+Types:
+  init  — project setup, scaffolding
+  add   — new feature or file
+  fix   — bug fix
+  test  — adding or updating tests
+  docs  — documentation only
+  refactor — code change that doesn't add/fix
+  chore — config, dependencies, CI
+ 
+Examples:
+  init: FastAPI project with folder structure
+  add: User model with cognito_sub and system_role
+  add: JWT validation middleware with 401/403 responses
+  fix: duplicate user creation on concurrent first logins
+  test: auth middleware returns 401 for expired tokens
+  docs: Cognito User Pool setup instructions
+```
+ 
+---
+ 
+## PR Review Checklist
+ 
+Before approving any PR:
+ 
+- [ ] Code runs locally (docker compose up, tests pass)
+- [ ] No hardcoded secrets or credentials
+- [ ] New env vars are documented in .env.example
+- [ ] Database changes have an Alembic migration
+- [ ] API changes include request/response schemas
+- [ ] At least one test for new functionality
+- [ ] PR description explains what and why
