@@ -28,6 +28,18 @@ format-fix: format
 typecheck:
 	python -m mypy app/
 
+migrate:
+	alembic upgrade head
+
+migrate-generate:
+	alembic revision --autogenerate -m "$(msg)"
+
+migrate-down:
+	alembic downgrade -1
+
+db-shell:
+	docker compose exec db psql -U postgres -d easyinventory
+	
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type d -name .pytest_cache -exec rm -rf {} +
