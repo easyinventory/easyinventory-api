@@ -1,4 +1,4 @@
-.PHONY: run test lint format typecheck clean
+.PHONY: run test lint format format-check format-fix typecheck clean
 
 run:
 	docker compose up
@@ -15,13 +15,15 @@ test-unit:
 test-functional:
 	python -m pytest tests/functional/ -v
 
-lint: format typecheck
+lint: format-check typecheck
 
 format:
+	python -m black app/ tests/
+
+format-check:
 	python -m black --check app/ tests/
 
-format-fix:
-	python -m black app/ tests/
+format-fix: format
 
 typecheck:
 	python -m mypy app/

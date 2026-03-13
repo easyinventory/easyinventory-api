@@ -33,7 +33,7 @@ FastAPI backend for the EasyInventory inventory management platform.
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements-dev.txt
+pip install -r dev-requirements.txt
 uvicorn app.main:app --reload
 ```
  
