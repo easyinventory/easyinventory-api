@@ -1,5 +1,22 @@
-import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
+from app.models.user import User
+
+
+def _mock_user(**overrides):
+    """Create a mock User model instance."""
+    defaults = {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "cognito_sub": "abc-123",
+        "email": "test@example.com",
+        "system_role": "SYSTEM_USER",
+        "is_active": True,
+        "created_at": "2026-03-13T00:00:00+00:00",
+    }
+    defaults.update(overrides)
+    mock = MagicMock(spec=User)
+    for key, value in defaults.items():
+        setattr(mock, key, value)
+    return mock
 
 
 async def test_me_returns_401_without_token(client):
@@ -26,56 +43,44 @@ async def test_me_returns_www_authenticate_header(client):
     assert response.headers.get("www-authenticate") == "Bearer"
 
 
-def _mock_verify_token(claims: dict):
-    """Create a mock that replaces verify_token with static claims."""
-
-    def _verify(token: str) -> dict:
-        return claims
-
-    return _verify
-
-
 async def test_me_returns_200_with_valid_token(client):
-    mock_claims = {
-        "sub": "abc-123",
-        "email": "test@example.com",
-        "token_use": "id",
-    }
+    mock_user = _mock_user()
     with patch(
         "app.api.deps.verify_token",
-        side_effect=_mock_verify_token(mock_claims),
+        return_value={"sub": "abc-123", "email": "test@example.com"},
     ):
-        response = await client.get(
-            "/api/me",
-            headers={"Authorization": "Bearer fake-but-mocked-token"},
-        )
+        with patch("app.api.deps.get_or_create_user", return_value=mock_user):
+            response = await client.get(
+                "/api/me",
+                headers={"Authorization": "Bearer fake-but-mocked-token"},
+            )
     assert response.status_code == 200
     data = response.json()
-    assert data["sub"] == "abc-123"
     assert data["email"] == "test@example.com"
+    assert data["system_role"] == "SYSTEM_USER"
 
 
-async def test_me_returns_correct_claims(client):
-    mock_claims = {
-        "sub": "user-789",
-        "email": "admin@company.com",
-        "token_use": "id",
-    }
+async def test_me_returns_user_fields(client):
+    mock_user = _mock_user(
+        email="admin@company.com",
+        system_role="SYSTEM_ADMIN",
+    )
     with patch(
         "app.api.deps.verify_token",
-        side_effect=_mock_verify_token(mock_claims),
+        return_value={"sub": "xyz-789", "email": "admin@company.com"},
     ):
-        response = await client.get(
-            "/api/me",
-            headers={"Authorization": "Bearer fake-but-mocked-token"},
-        )
+        with patch("app.api.deps.get_or_create_user", return_value=mock_user):
+            response = await client.get(
+                "/api/me",
+                headers={"Authorization": "Bearer fake-token"},
+            )
     data = response.json()
-    assert data["sub"] == "user-789"
     assert data["email"] == "admin@company.com"
-    assert data["token_use"] == "id"
+    assert data["system_role"] == "SYSTEM_ADMIN"
+    assert data["is_active"] is True
 
 
 async def test_health_does_not_require_auth(client):
-    """Health check must remain public — no auth needed."""
+    """Health check must remain public."""
     response = await client.get("/health")
     assert response.status_code == 200
