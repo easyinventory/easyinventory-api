@@ -73,3 +73,9 @@ async def test_me_returns_correct_claims(client):
     assert data["sub"] == "user-789"
     assert data["email"] == "admin@company.com"
     assert data["token_use"] == "id"
+
+
+async def test_health_does_not_require_auth(client):
+    """Health check must remain public — no auth needed."""
+    response = await client.get("/health")
+    assert response.status_code == 200
