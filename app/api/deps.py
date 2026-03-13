@@ -1,25 +1,32 @@
+from __future__ import annotations
+
 from typing import Any
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cognito import verify_token
+from app.core.database import get_db
+from app.models.user import User
+from app.services.user_service import get_or_create_user
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-) -> dict[str, Any]:
+    db: AsyncSession = Depends(get_db),
+) -> User:
     """
-    FastAPI dependency that extracts and validates the JWT.
+    FastAPI dependency: validate JWT → get or create user in DB.
 
-    Usage in any route:
+    Usage:
         @router.get("/something")
-        async def something(user: dict = Depends(get_current_user)):
-            print(user["sub"], user["email"])
+        async def something(user: User = Depends(get_current_user)):
+            print(user.id, user.email, user.system_role)
 
-    Returns decoded JWT claims on success.
+    Returns a User model instance (not raw claims).
     Raises 401 if token is missing, expired, or invalid.
     """
     if credentials is None:
@@ -40,4 +47,10 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return claims
+    user = await get_or_create_user(
+        db=db,
+        cognito_sub=claims["sub"],
+        email=claims.get("email", ""),
+    )
+
+    return user
