@@ -64,6 +64,22 @@ GET http://localhost:8000/health
 
 **Important:** Always run database commands through Docker, not locally:
 
+
+## Authentication (Cognito)
+ 
+This app uses AWS Cognito for authentication. See
+[docs/cognito-setup.md](docs/cognito-setup.md) for the full setup guide.
+ 
+Required `.env` variables:
+ 
+    COGNITO_REGION=us-east-1
+    COGNITO_USER_POOL_ID=<your pool id>
+    COGNITO_APP_CLIENT_ID=<your client id>
+ 
+The app fetches Cognito's public keys (JWKS) on first token
+verification and caches them for the process lifetime.
+
+
 ```bash
 # Run migrations
 docker compose exec api alembic upgrade head
