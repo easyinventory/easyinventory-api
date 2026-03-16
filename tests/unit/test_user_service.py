@@ -109,7 +109,7 @@ async def test_bootstrap_email_gets_admin_role(mock_settings):
         email="admin@company.com",
     )
 
-    added_user = mock_db.add.call_args[0][0]
+    added_user = mock_db.add.call_args_list[0][0][0]
     assert added_user.system_role == "SYSTEM_ADMIN"
 
 
@@ -157,7 +157,7 @@ async def test_bootstrap_email_case_insensitive(mock_settings):
         email="admin@company.com",
     )
 
-    added_user = mock_db.add.call_args[0][0]
+    added_user = mock_db.add.call_args_list[0][0][0]
     assert added_user.system_role == "SYSTEM_ADMIN"
 
 
