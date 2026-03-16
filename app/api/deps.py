@@ -118,7 +118,7 @@ async def get_current_org_membership(
     return membership
 
 
-def require_org_role(*allowed_roles: str):
+def require_org_role(*allowed_roles: str) -> Callable[..., Any]:
     """Dependency factory: checks the user's org_role."""
 
     async def _check_org_role(
