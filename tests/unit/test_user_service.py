@@ -87,3 +87,127 @@ async def test_does_not_duplicate_existing_user():
 
     assert user1 == user2
     mock_db.add.assert_not_called()
+
+
+@patch("app.services.user_service.settings")
+async def test_bootstrap_email_gets_admin_role(mock_settings):
+    """User matching BOOTSTRAP_ADMIN_EMAIL gets SYSTEM_ADMIN."""
+    mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = None
+
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock()
+    mock_db.execute.return_value = mock_result
+
+    from app.services.user_service import get_or_create_user
+
+    await get_or_create_user(
+        db=mock_db,
+        cognito_sub="admin-sub",
+        email="admin@company.com",
+    )
+
+    added_user = mock_db.add.call_args[0][0]
+    assert added_user.system_role == "SYSTEM_ADMIN"
+
+
+@patch("app.services.user_service.settings")
+async def test_non_bootstrap_email_gets_user_role(mock_settings):
+    """Regular user should NOT get SYSTEM_ADMIN."""
+    mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = None
+
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock()
+    mock_db.execute.return_value = mock_result
+
+    from app.services.user_service import get_or_create_user
+
+    await get_or_create_user(
+        db=mock_db,
+        cognito_sub="regular-sub",
+        email="regular@company.com",
+    )
+
+    added_user = mock_db.add.call_args[0][0]
+    assert added_user.system_role == "SYSTEM_USER"
+
+
+@patch("app.services.user_service.settings")
+async def test_bootstrap_email_case_insensitive(mock_settings):
+    """Bootstrap email check should be case-insensitive."""
+    mock_settings.BOOTSTRAP_ADMIN_EMAIL = "Admin@Company.com"
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = None
+
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock()
+    mock_db.execute.return_value = mock_result
+
+    from app.services.user_service import get_or_create_user
+
+    await get_or_create_user(
+        db=mock_db,
+        cognito_sub="admin-sub",
+        email="admin@company.com",
+    )
+
+    added_user = mock_db.add.call_args[0][0]
+    assert added_user.system_role == "SYSTEM_ADMIN"
+
+
+@patch("app.services.user_service.settings")
+async def test_empty_bootstrap_email_no_admin(mock_settings):
+    """If BOOTSTRAP_ADMIN_EMAIL is empty, nobody gets admin."""
+    mock_settings.BOOTSTRAP_ADMIN_EMAIL = ""
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = None
+
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock()
+    mock_db.execute.return_value = mock_result
+
+    from app.services.user_service import get_or_create_user
+
+    await get_or_create_user(
+        db=mock_db,
+        cognito_sub="any-sub",
+        email="anyone@company.com",
+    )
+
+    added_user = mock_db.add.call_args[0][0]
+    assert added_user.system_role == "SYSTEM_USER"
+
+
+@patch("app.services.user_service.settings")
+async def test_existing_user_role_not_changed(mock_settings):
+    """If user already exists, their role should NOT be updated."""
+    mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
+
+    existing_user = MagicMock()
+    existing_user.cognito_sub = "admin-sub"
+    existing_user.system_role = "SYSTEM_USER"  # was created before bootstrap was set
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = existing_user
+
+    mock_db = AsyncMock()
+    mock_db.execute.return_value = mock_result
+
+    from app.services.user_service import get_or_create_user
+
+    user = await get_or_create_user(
+        db=mock_db,
+        cognito_sub="admin-sub",
+        email="admin@company.com",
+    )
+
+    # Should return existing user without changing role
+    assert user.system_role == "SYSTEM_USER"
+    mock_db.add.assert_not_called()

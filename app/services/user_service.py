@@ -3,6 +3,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.user import User
 
 
@@ -14,16 +15,8 @@ async def get_or_create_user(
     """
     Look up a user by cognito_sub. If not found, create one.
 
-    This is called on every authenticated request via the
-    get_current_user dependency. The lookup is indexed so it's fast.
-
-    Args:
-        db: Active database session
-        cognito_sub: The 'sub' claim from the Cognito JWT
-        email: The 'email' claim from the JWT
-
-    Returns:
-        The existing or newly created User instance
+    If the user's email matches BOOTSTRAP_ADMIN_EMAIL, they are
+    created with SYSTEM_ADMIN role instead of the default SYSTEM_USER.
     """
     stmt = select(User).where(User.cognito_sub == cognito_sub)
     result = await db.execute(stmt)
@@ -32,13 +25,28 @@ async def get_or_create_user(
     if user is not None:
         return user
 
-    # First login — create the user
+    # Determine role — bootstrap admin or regular user
+    role = "SYSTEM_ADMIN" if _is_bootstrap_admin(email) else "SYSTEM_USER"
+
     user = User(
         cognito_sub=cognito_sub,
         email=email,
-        system_role="SYSTEM_USER",
+        system_role=role,
     )
     db.add(user)
     await db.flush()
 
     return user
+
+
+def _is_bootstrap_admin(email: str) -> bool:
+    """
+    Check if this email should be auto-promoted to admin.
+
+    Returns False if BOOTSTRAP_ADMIN_EMAIL is not set.
+    Comparison is case-insensitive.
+    """
+    bootstrap_email = settings.BOOTSTRAP_ADMIN_EMAIL
+    if not bootstrap_email:
+        return False
+    return email.strip().lower() == bootstrap_email.strip().lower()
