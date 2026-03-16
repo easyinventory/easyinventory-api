@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 from app.core.config import settings
 from app.core.database import engine
-from app.api.routes import health
+from app.api.routes import health, auth
 
 
 @asynccontextmanager
@@ -38,6 +38,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health.router)
+    app.include_router(auth.router)
 
     return app
 
