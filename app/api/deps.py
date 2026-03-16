@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import Depends, HTTPException, status
@@ -56,7 +57,7 @@ async def get_current_user(
     return user
 
 
-def require_role(*allowed_roles: str):
+def require_role(*allowed_roles: str) -> Callable[..., Any]:
     """
     Dependency factory that checks the user's system_role.
 
