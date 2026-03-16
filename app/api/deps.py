@@ -54,3 +54,37 @@ async def get_current_user(
     )
 
     return user
+
+
+def require_role(*allowed_roles: str):
+    """
+    Dependency factory that checks the user's system_role.
+
+    Usage:
+        @router.get("/admin-only")
+        async def admin_only(
+            user: User = Depends(require_role("SYSTEM_ADMIN")),
+        ):
+            ...
+
+        @router.get("/admin-or-user")
+        async def admin_or_user(
+            user: User = Depends(require_role("SYSTEM_ADMIN", "SYSTEM_USER")),
+        ):
+            ...
+
+    Returns the User if they have one of the allowed roles.
+    Raises 403 if they don't.
+    """
+
+    async def _check_role(
+        current_user: User = Depends(get_current_user),
+    ) -> User:
+        if current_user.system_role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions",
+            )
+        return current_user
+
+    return _check_role
