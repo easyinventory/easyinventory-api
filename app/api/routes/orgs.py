@@ -12,6 +12,7 @@ from app.api.deps import (
     get_current_org_membership,
     require_org_role,
 )
+from app.core.cognito import invite_cognito_user
 from app.core.database import get_db
 from app.models.user import User
 from app.models.org_membership import OrgMembership
@@ -179,7 +180,10 @@ async def invite_member(
             is_active=True,
         )
     else:
-        # Unknown email → placeholder user + inactive membership
+        # Unknown email → create Cognito account + send invite email
+        invite_cognito_user(body.email)
+
+        # Create placeholder user + inactive membership
         placeholder = await org_service.create_placeholder_user(db, body.email)
         new_membership = await org_service.create_membership(
             db=db,
