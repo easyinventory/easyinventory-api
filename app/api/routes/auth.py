@@ -1,26 +1,20 @@
-from typing import Any
-
 from fastapi import APIRouter, Depends
 
 from app.api.deps import get_current_user
+from app.models.user import User
+from app.schemas.user import UserResponse
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
 
-@router.get("/me")
+@router.get("/me", response_model=UserResponse)
 async def get_me(
-    current_user: dict[str, Any] = Depends(get_current_user),
-) -> dict[str, Any]:
+    current_user: User = Depends(get_current_user),
+) -> User:
     """
-    Return the current user's JWT claims.
+    Return the current user's profile from the database.
 
-    Requires a valid Bearer token in the Authorization header.
-    This endpoint is useful for:
-    - Verifying auth is working end-to-end
-    - The frontend to fetch user info after login
+    On first call, automatically creates the user record from
+    the JWT claims. Subsequent calls return the existing record.
     """
-    return {
-        "sub": current_user.get("sub"),
-        "email": current_user.get("email"),
-        "token_use": current_user.get("token_use"),
-    }
+    return current_user
