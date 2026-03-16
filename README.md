@@ -114,51 +114,24 @@ Required in `.env`:
 If the email already has a Cognito account, the invite only
 creates the org membership (no duplicate Cognito account).
 
-### Verification Before Opening the PR
+## System Admin — Organization Management
 
-```bash
-# 1. Install new dependency
-pip install -r dev-requirements.txt
+| Method | Endpoint | Role Required | Description |
+|---|---|---|---|
+| POST | /api/admin/orgs | SYSTEM_ADMIN | Create org + assign owner |
+| GET | /api/admin/orgs | SYSTEM_ADMIN | List all organizations |
 
-# 2. All tests pass
-make test
-# → 80+ passed
+**Onboarding a new client:**
+1. System admin calls POST /api/admin/orgs with org name + owner email
+2. If the email is new → Cognito invite sent, placeholder created
+3. If the email exists → they become the active owner immediately
+4. Owner logs in → can invite their own team members
 
-# 3. Lint clean
-make lint
-
-# 4. Manual test — full invite flow
-TOKEN=$(aws cognito-idp initiate-auth \
-  --client-id 4bjjm8t2it5oigmr2js2vo5mt7 \
-  --auth-flow USER_PASSWORD_AUTH \
-  --auth-parameters USERNAME=stephen.brock928@gmail.com,PASSWORD='YourNewStrongPassword123!' \
-  --region us-east-2 \
-  --query 'AuthenticationResult.IdToken' --output text)
-
-# Invite someone
-curl -s -X POST -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"email": "teammate@gmail.com", "org_role": "ORG_EMPLOYEE"}' \
-  http://localhost:8000/api/orgs/invite | python -m json.tool
-# → 201, is_active: false (placeholder)
-
-# Try inviting same email again
-curl -s -X POST -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"email": "teammate@gmail.com", "org_role": "ORG_EMPLOYEE"}' \
-  http://localhost:8000/api/orgs/invite | python -m json.tool
-# → 400 "already been invited"
-
-# List members — should show pending invite
-curl -s -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8000/api/orgs/members | python -m json.tool
-
-# Check DB
+**Becoming a system admin:**
+Currently manual — update the `system_role` column in the database:
 docker compose exec db psql -U postgres -d easyinventory \
-  -c "SELECT email, cognito_sub, is_active FROM users;"
-# → teammate@gmail.com | pending:teammate@gmail.com | false
-```
-
+-c "UPDATE users SET system_role = 'SYSTEM_ADMIN' WHERE email = 'admin@company.com';"
+This will be replaced by a proper endpoint in a future sprint.
 
 ```bash
 # Run migrations
