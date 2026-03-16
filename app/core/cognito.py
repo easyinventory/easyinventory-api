@@ -89,6 +89,8 @@ def invite_cognito_user(email: str) -> bool:
     client = boto3.client(
         "cognito-idp",
         region_name=settings.COGNITO_REGION,
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID or None,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY or None,
     )
 
     try:
