@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     COGNITO_USER_POOL_ID: str = ""
     COGNITO_APP_CLIENT_ID: str = ""
 
+    # AWS credentials (for boto3 — Cognito admin operations)
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+
     # Bootstrap (PR-06)
     BOOTSTRAP_ADMIN_EMAIL: str = ""
 

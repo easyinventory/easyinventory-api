@@ -1,8 +1,11 @@
 from functools import lru_cache
-
-import requests
-from jose import jwt, JWTError
 from typing import Any
+
+import boto3
+import requests
+from botocore.exceptions import ClientError
+from jose import jwt, JWTError
+
 from app.core.config import settings
 
 
@@ -68,3 +71,41 @@ def verify_token(token: str) -> dict[str, Any]:
         issuer=issuer,
     )
     return claims
+
+
+def invite_cognito_user(email: str) -> bool:
+    """
+    Create a Cognito user account and send an invite email
+    with a temporary password.
+
+    Cognito sends an email like:
+      "Your administrator has invited you to join EasyInventory.
+       Your username is: <email>
+       Your temporary password is: <temp_password>
+       Sign in at: <login_url>"
+
+    Returns True if the user was created, False if they already exist.
+    """
+    client = boto3.client(
+        "cognito-idp",
+        region_name=settings.COGNITO_REGION,
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID or None,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY or None,
+    )
+
+    try:
+        client.admin_create_user(
+            UserPoolId=settings.COGNITO_USER_POOL_ID,
+            Username=email,
+            UserAttributes=[
+                {"Name": "email", "Value": email},
+                {"Name": "email_verified", "Value": "true"},
+            ],
+            DesiredDeliveryMediums=["EMAIL"],
+        )
+        return True
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "UsernameExistsException":
+            # User already has a Cognito account — that's fine
+            return False
+        raise

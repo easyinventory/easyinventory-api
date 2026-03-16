@@ -120,6 +120,77 @@ async def test_duplicate_pending_invite_returns_400(app, client):
     assert "already been invited" in response.json()["detail"]
 
 
+async def test_invite_unknown_email_calls_cognito(app, client):
+    """Inviting an unknown email should create a Cognito account."""
+    membership = _mock_membership(role="ORG_OWNER")
+
+    with _org_dependency_overrides(app, membership):
+        with patch("app.services.org_service.find_user_by_email", return_value=None):
+            with patch("app.api.routes.orgs.invite_cognito_user") as mock_cognito:
+                with patch(
+                    "app.services.org_service.create_placeholder_user"
+                ) as mock_placeholder:
+                    placeholder_user = MagicMock(id=uuid.uuid4())
+                    mock_placeholder.return_value = placeholder_user
+
+                    with patch(
+                        "app.services.org_service.create_membership"
+                    ) as mock_membership_create:
+                        mock_membership_create.return_value = MagicMock(
+                            id=uuid.uuid4(),
+                            user_id=placeholder_user.id,
+                            org_role="ORG_EMPLOYEE",
+                            is_active=False,
+                            joined_at="2026-03-13T00:00:00+00:00",
+                        )
+
+                        response = await client.post(
+                            "/api/orgs/invite",
+                            json={"email": "new@test.com", "org_role": "ORG_EMPLOYEE"},
+                            headers={"Authorization": "Bearer fake"},
+                        )
+
+    assert response.status_code == 201
+    mock_cognito.assert_called_once_with("new@test.com")
+
+
+async def test_invite_existing_email_does_not_call_cognito(app, client):
+    """Inviting an existing user should NOT create a Cognito account."""
+    membership = _mock_membership(role="ORG_OWNER")
+    existing_user = _mock_user(email="exists@test.com")
+
+    with _org_dependency_overrides(app, membership):
+        with patch(
+            "app.services.org_service.find_user_by_email", return_value=existing_user
+        ):
+            with patch(
+                "app.services.org_service.find_existing_membership", return_value=None
+            ):
+                with patch("app.api.routes.orgs.invite_cognito_user") as mock_cognito:
+                    with patch(
+                        "app.services.org_service.create_membership"
+                    ) as mock_create:
+                        mock_create.return_value = MagicMock(
+                            id=uuid.uuid4(),
+                            user_id=existing_user.id,
+                            org_role="ORG_EMPLOYEE",
+                            is_active=True,
+                            joined_at="2026-03-13T00:00:00+00:00",
+                        )
+
+                        response = await client.post(
+                            "/api/orgs/invite",
+                            json={
+                                "email": "exists@test.com",
+                                "org_role": "ORG_EMPLOYEE",
+                            },
+                            headers={"Authorization": "Bearer fake"},
+                        )
+
+    assert response.status_code == 201
+    mock_cognito.assert_not_called()
+
+
 # ── Owner protection tests ──
 
 

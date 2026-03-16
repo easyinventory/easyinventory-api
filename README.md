@@ -101,6 +101,19 @@ placeholder user is created. When they sign up via Cognito, the
 placeholder is automatically claimed and their membership activated.
 Duplicate invites (active member or pending placeholder) return 400.
 
+### Invite emails
+When inviting a new email (not yet in the system), Cognito
+automatically creates their account and sends an invite email
+with a temporary password. The invite uses `admin_create_user`
+via boto3.
+
+Required in `.env`:
+- `AWS_ACCESS_KEY_ID` — IAM user with CognitoPowerUser access
+- `AWS_SECRET_ACCESS_KEY` — corresponding secret key
+
+If the email already has a Cognito account, the invite only
+creates the org membership (no duplicate Cognito account).
+
 ### Verification Before Opening the PR
 
 ```bash
