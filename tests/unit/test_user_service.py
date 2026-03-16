@@ -2,6 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import uuid
 
 from app.services.user_service import get_or_create_user
+from app.models.org_membership import OrgMembership
 from app.models.user import User
 
 
@@ -262,3 +263,119 @@ async def test_regular_user_does_not_trigger_org_creation(
     )
 
     mock_create_org.assert_not_called()
+
+
+@patch("app.services.user_service.settings")
+async def test_placeholder_claimed_on_first_login(mock_settings):
+    """Invited user logging in claims their placeholder."""
+    mock_settings.BOOTSTRAP_ADMIN_EMAIL = ""
+
+    placeholder = MagicMock(spec=User)
+    placeholder.id = uuid.uuid4()
+    placeholder.cognito_sub = "pending:invited@test.com"
+    placeholder.email = "invited@test.com"
+    placeholder.is_active = False
+
+    # Query 1: by cognito_sub → not found
+    sub_result = MagicMock()
+    sub_result.scalar_one_or_none.return_value = None
+
+    # Query 2: by email + pending → found placeholder
+    email_result = MagicMock()
+    email_result.scalar_one_or_none.return_value = placeholder
+
+    # Query 3: inactive memberships → one found
+    mock_membership = MagicMock(spec=OrgMembership)
+    mock_membership.is_active = False
+    membership_result = MagicMock()
+    membership_result.scalars.return_value.all.return_value = [mock_membership]
+
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock()
+    mock_db.execute.side_effect = [sub_result, email_result, membership_result]
+
+    from app.services.user_service import get_or_create_user
+
+    user = await get_or_create_user(
+        db=mock_db,
+        cognito_sub="real-sub-123",
+        email="invited@test.com",
+    )
+
+    assert user == placeholder
+    assert user.cognito_sub == "real-sub-123"
+    assert user.is_active is True
+    assert mock_membership.is_active is True
+    mock_db.add.assert_not_called()
+
+
+@patch("app.services.user_service.settings")
+async def test_placeholder_activates_multiple_memberships(mock_settings):
+    """Claiming placeholder activates ALL their org memberships."""
+    mock_settings.BOOTSTRAP_ADMIN_EMAIL = ""
+
+    placeholder = MagicMock(spec=User)
+    placeholder.id = uuid.uuid4()
+    placeholder.cognito_sub = "pending:multi@test.com"
+    placeholder.email = "multi@test.com"
+    placeholder.is_active = False
+
+    sub_result = MagicMock()
+    sub_result.scalar_one_or_none.return_value = None
+
+    email_result = MagicMock()
+    email_result.scalar_one_or_none.return_value = placeholder
+
+    m1 = MagicMock(spec=OrgMembership)
+    m1.is_active = False
+    m2 = MagicMock(spec=OrgMembership)
+    m2.is_active = False
+    membership_result = MagicMock()
+    membership_result.scalars.return_value.all.return_value = [m1, m2]
+
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock()
+    mock_db.execute.side_effect = [sub_result, email_result, membership_result]
+
+    from app.services.user_service import get_or_create_user
+
+    await get_or_create_user(
+        db=mock_db,
+        cognito_sub="real-sub-456",
+        email="multi@test.com",
+    )
+
+    assert m1.is_active is True
+    assert m2.is_active is True
+
+
+@patch("app.services.user_service.settings")
+async def test_no_placeholder_creates_new_user(mock_settings):
+    """If no placeholder exists, creates a new user normally."""
+    mock_settings.BOOTSTRAP_ADMIN_EMAIL = ""
+
+    # Query 1: by cognito_sub → not found
+    sub_result = MagicMock()
+    sub_result.scalar_one_or_none.return_value = None
+
+    # Query 2: by email + pending → not found
+    email_result = MagicMock()
+    email_result.scalar_one_or_none.return_value = None
+
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock()
+    mock_db.execute.side_effect = [sub_result, email_result]
+
+    from app.services.user_service import get_or_create_user
+
+    await get_or_create_user(
+        db=mock_db,
+        cognito_sub="brand-new-sub",
+        email="brand@new.com",
+    )
+
+    mock_db.add.assert_called_once()
+    added = mock_db.add.call_args[0][0]
+    assert isinstance(added, User)
+    assert added.cognito_sub == "brand-new-sub"
+    assert added.email == "brand@new.com"

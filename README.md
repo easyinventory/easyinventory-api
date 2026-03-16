@@ -79,6 +79,73 @@ Required `.env` variables:
 The app fetches Cognito's public keys (JWKS) on first token
 verification and caches them for the process lifetime.
 
+## Organization Management
+
+| Method | Endpoint | Role Required | Description |
+|---|---|---|---|
+| GET | /api/orgs/members | Any org member | List all members |
+| POST | /api/orgs/invite | ORG_OWNER, ORG_ADMIN | Invite by email |
+| PATCH | /api/orgs/members/{id}/role | ORG_OWNER, ORG_ADMIN | Change role |
+| PATCH | /api/orgs/members/{id}/deactivate | ORG_OWNER, ORG_ADMIN | Deactivate |
+| PATCH | /api/orgs/members/{id}/activate | ORG_OWNER, ORG_ADMIN | Reactivate |
+| DELETE | /api/orgs/members/{id} | ORG_OWNER, ORG_ADMIN | Remove |
+
+**Permission checks** are enforced in the route layer.
+**Service layer** is pure database operations.
+
+The owner cannot be deactivated, removed, or have their role changed.
+Admins can manage employees and viewers but not other admins or the owner.
+
+**Invite flow:** When inviting an email that hasn't signed up yet, a
+placeholder user is created. When they sign up via Cognito, the
+placeholder is automatically claimed and their membership activated.
+Duplicate invites (active member or pending placeholder) return 400.
+
+### Verification Before Opening the PR
+
+```bash
+# 1. Install new dependency
+pip install -r dev-requirements.txt
+
+# 2. All tests pass
+make test
+# → 80+ passed
+
+# 3. Lint clean
+make lint
+
+# 4. Manual test — full invite flow
+TOKEN=$(aws cognito-idp initiate-auth \
+  --client-id 4bjjm8t2it5oigmr2js2vo5mt7 \
+  --auth-flow USER_PASSWORD_AUTH \
+  --auth-parameters USERNAME=stephen.brock928@gmail.com,PASSWORD='YourNewStrongPassword123!' \
+  --region us-east-2 \
+  --query 'AuthenticationResult.IdToken' --output text)
+
+# Invite someone
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "teammate@gmail.com", "org_role": "ORG_EMPLOYEE"}' \
+  http://localhost:8000/api/orgs/invite | python -m json.tool
+# → 201, is_active: false (placeholder)
+
+# Try inviting same email again
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "teammate@gmail.com", "org_role": "ORG_EMPLOYEE"}' \
+  http://localhost:8000/api/orgs/invite | python -m json.tool
+# → 400 "already been invited"
+
+# List members — should show pending invite
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8000/api/orgs/members | python -m json.tool
+
+# Check DB
+docker compose exec db psql -U postgres -d easyinventory \
+  -c "SELECT email, cognito_sub, is_active FROM users;"
+# → teammate@gmail.com | pending:teammate@gmail.com | false
+```
+
 
 ```bash
 # Run migrations
