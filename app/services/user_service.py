@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.user import User
+from app.services.org_service import create_default_org
 
 
 async def get_or_create_user(
@@ -15,8 +16,8 @@ async def get_or_create_user(
     """
     Look up a user by cognito_sub. If not found, create one.
 
-    If the user's email matches BOOTSTRAP_ADMIN_EMAIL, they are
-    created with SYSTEM_ADMIN role instead of the default SYSTEM_USER.
+    If the user is the bootstrap admin, also creates the default
+    organization and adds them as ORG_OWNER.
     """
     stmt = select(User).where(User.cognito_sub == cognito_sub)
     result = await db.execute(stmt)
@@ -25,8 +26,9 @@ async def get_or_create_user(
     if user is not None:
         return user
 
-    # Determine role — bootstrap admin or regular user
-    role = "SYSTEM_ADMIN" if _is_bootstrap_admin(email) else "SYSTEM_USER"
+    # Determine role
+    is_admin = _is_bootstrap_admin(email)
+    role = "SYSTEM_ADMIN" if is_admin else "SYSTEM_USER"
 
     user = User(
         cognito_sub=cognito_sub,
@@ -36,16 +38,14 @@ async def get_or_create_user(
     db.add(user)
     await db.flush()
 
+    # Bootstrap admin gets a default org
+    if is_admin:
+        await create_default_org(db=db, owner_id=user.id)
+
     return user
 
 
 def _is_bootstrap_admin(email: str) -> bool:
-    """
-    Check if this email should be auto-promoted to admin.
-
-    Returns False if BOOTSTRAP_ADMIN_EMAIL is not set.
-    Comparison is case-insensitive.
-    """
     bootstrap_email = settings.BOOTSTRAP_ADMIN_EMAIL
     if not bootstrap_email:
         return False
