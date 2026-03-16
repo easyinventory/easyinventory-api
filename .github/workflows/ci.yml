@@ -40,10 +40,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r dev-requirements.txt
 
-      - name: Lint (black + mypy)
+      - name: Lint + Format Check
         run: |
-          black --check .
-          mypy app/
+          make lint
+          make format-check
 
       - name: Test
         env:
