@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.organization import Organization
@@ -200,3 +200,57 @@ async def get_user_by_id(
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def list_all_orgs(db: AsyncSession) -> list[dict]:
+    """
+    List all organizations with owner email and member count.
+    System admin only — returns data across all orgs.
+    """
+    # Subquery: count members per org
+    member_count_sq = (
+        select(
+            OrgMembership.org_id,
+            func.count(OrgMembership.id).label("member_count"),
+        )
+        .group_by(OrgMembership.org_id)
+        .subquery()
+    )
+
+    # Subquery: owner email per org
+    owner_sq = (
+        select(
+            OrgMembership.org_id,
+            User.email.label("owner_email"),
+        )
+        .join(User, OrgMembership.user_id == User.id)
+        .where(OrgMembership.org_role == "ORG_OWNER")
+        .subquery()
+    )
+
+    stmt = (
+        select(
+            Organization.id,
+            Organization.name,
+            Organization.created_at,
+            owner_sq.c.owner_email,
+            func.coalesce(member_count_sq.c.member_count, 0).label("member_count"),
+        )
+        .outerjoin(owner_sq, Organization.id == owner_sq.c.org_id)
+        .outerjoin(member_count_sq, Organization.id == member_count_sq.c.org_id)
+        .order_by(Organization.created_at.desc())
+    )
+
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    return [
+        {
+            "id": row.id,
+            "name": row.name,
+            "created_at": row.created_at,
+            "owner_email": row.owner_email,
+            "member_count": row.member_count,
+        }
+        for row in rows
+    ]
