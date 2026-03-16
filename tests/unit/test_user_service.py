@@ -109,7 +109,7 @@ async def test_bootstrap_email_gets_admin_role(mock_settings):
         email="admin@company.com",
     )
 
-    added_user = mock_db.add.call_args[0][0]
+    added_user = mock_db.add.call_args_list[0][0][0]
     assert added_user.system_role == "SYSTEM_ADMIN"
 
 
@@ -157,7 +157,7 @@ async def test_bootstrap_email_case_insensitive(mock_settings):
         email="admin@company.com",
     )
 
-    added_user = mock_db.add.call_args[0][0]
+    added_user = mock_db.add.call_args_list[0][0][0]
     assert added_user.system_role == "SYSTEM_ADMIN"
 
 
@@ -211,3 +211,54 @@ async def test_existing_user_role_not_changed(mock_settings):
     # Should return existing user without changing role
     assert user.system_role == "SYSTEM_USER"
     mock_db.add.assert_not_called()
+
+
+@patch("app.services.user_service.create_default_org")
+@patch("app.services.user_service.settings")
+async def test_admin_triggers_org_creation(mock_settings, mock_create_org):
+    """Bootstrap admin creation should trigger create_default_org."""
+    mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
+    mock_create_org.return_value = MagicMock()
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = None
+
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock()
+    mock_db.execute.return_value = mock_result
+
+    from app.services.user_service import get_or_create_user
+
+    await get_or_create_user(
+        db=mock_db,
+        cognito_sub="admin-sub",
+        email="admin@company.com",
+    )
+
+    mock_create_org.assert_called_once()
+
+
+@patch("app.services.user_service.create_default_org")
+@patch("app.services.user_service.settings")
+async def test_regular_user_does_not_trigger_org_creation(
+    mock_settings, mock_create_org
+):
+    """Regular user should NOT create an org."""
+    mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = None
+
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock()
+    mock_db.execute.return_value = mock_result
+
+    from app.services.user_service import get_or_create_user
+
+    await get_or_create_user(
+        db=mock_db,
+        cognito_sub="regular-sub",
+        email="regular@company.com",
+    )
+
+    mock_create_org.assert_not_called()
