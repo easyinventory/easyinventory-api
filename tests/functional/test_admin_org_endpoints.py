@@ -83,10 +83,11 @@ async def test_admin_can_create_org_with_new_email(app, client):
         ):
             with patch("app.api.deps.get_or_create_user", return_value=admin):
                 with patch(
-                    "app.services.org_service.find_user_by_email", return_value=None
+                    "app.services.invite_service.org_service.find_user_by_email",
+                    return_value=None,
                 ):
                     with patch(
-                        "app.api.routes.admin.invite_cognito_user"
+                        "app.services.invite_service.invite_cognito_user"
                     ) as mock_cognito:
                         with patch(
                             "app.services.org_service.create_placeholder_user",
@@ -133,7 +134,7 @@ async def test_admin_can_create_org_with_existing_user(app, client):
                         return_value=None,
                     ):
                         with patch(
-                            "app.api.routes.admin.invite_cognito_user"
+                            "app.services.invite_service.invite_cognito_user"
                         ) as mock_cognito:
                             with patch("app.services.org_service.create_membership"):
                                 response = await client.post(
