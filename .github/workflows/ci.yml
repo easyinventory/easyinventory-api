@@ -109,20 +109,22 @@ jobs:
           script: |
             set -e
             cd ~/easyinventory
-            git pull
 
-            # Build .env.prod from .env.example, injecting secrets
-            cp .env.example .env.prod
-            sed -i "s|^DATABASE_URL=.*|DATABASE_URL=${DATABASE_URL}|" .env.prod
-            sed -i "s|^COGNITO_REGION=.*|COGNITO_REGION=${AWS_REGION}|" .env.prod
-            sed -i "s|^COGNITO_USER_POOL_ID=.*|COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}|" .env.prod
-            sed -i "s|^COGNITO_APP_CLIENT_ID=.*|COGNITO_APP_CLIENT_ID=${COGNITO_APP_CLIENT_ID}|" .env.prod
-            sed -i "s|^AWS_ACCESS_KEY_ID=.*|AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}|" .env.prod
-            sed -i "s|^AWS_SECRET_ACCESS_KEY=.*|AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}|" .env.prod
-            sed -i "s|^BOOTSTRAP_ADMIN_EMAIL=.*|BOOTSTRAP_ADMIN_EMAIL=${BOOTSTRAP_ADMIN_EMAIL}|" .env.prod
-            # Append AWS account/region (used by ECR login; not in .env.example)
-            grep -q "^AWS_ACCOUNT_ID=" .env.prod || echo "AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}" >> .env.prod
-            grep -q "^AWS_REGION=" .env.prod || echo "AWS_REGION=${AWS_REGION}" >> .env.prod
+            # Write .env.prod directly from injected secrets (no git clone required)
+            # Write .env.prod directly from injected secrets (no git clone required)
+            printf '%s\n' \
+              "APP_NAME=EasyInventory API" \
+              "DEBUG=false" \
+              "DATABASE_URL=${DATABASE_URL}" \
+              "COGNITO_REGION=${AWS_REGION}" \
+              "COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}" \
+              "COGNITO_APP_CLIENT_ID=${COGNITO_APP_CLIENT_ID}" \
+              "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}" \
+              "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}" \
+              "AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}" \
+              "AWS_REGION=${AWS_REGION}" \
+              "BOOTSTRAP_ADMIN_EMAIL=${BOOTSTRAP_ADMIN_EMAIL}" \
+              > .env.prod
 
             source .env.prod
             aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
