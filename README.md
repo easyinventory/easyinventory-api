@@ -116,6 +116,19 @@ Required in `.env`:
 If the email already has a Cognito account, the invite only
 creates the org membership (no duplicate Cognito account).
 
+## Suppliers
+
+| Method | Endpoint | Role Required | Description |
+|---|---|---|---|
+| GET | /api/suppliers | Any org member | List suppliers |
+| GET | /api/suppliers/{id} | Any org member | Get supplier |
+| POST | /api/suppliers | Any org member | Create supplier |
+| PUT | /api/suppliers/{id} | Any org member | Update supplier |
+| DELETE | /api/suppliers/{id} | ORG_OWNER, ORG_ADMIN | Delete supplier |
+
+All supplier data is scoped to the current user's org. You can
+only see and manage suppliers belonging to your organization.
+
 ## System Admin — Organization Management
 
 | Method | Endpoint | Role Required | Description |
