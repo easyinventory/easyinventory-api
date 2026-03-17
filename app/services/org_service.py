@@ -6,6 +6,7 @@ from typing import Optional
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.roles import OrgRole, SystemRole
 from app.models.organization import Organization
 from app.models.org_membership import OrgMembership
 from app.models.user import User
@@ -50,7 +51,7 @@ async def create_default_org(
     membership = OrgMembership(
         org_id=org.id,
         user_id=owner_id,
-        org_role="ORG_OWNER",
+        org_role=OrgRole.OWNER,
     )
     db.add(membership)
     await db.flush()
@@ -153,7 +154,7 @@ async def create_placeholder_user(
     user = User(
         cognito_sub=f"pending:{email}",
         email=email,
-        system_role="SYSTEM_USER",
+        system_role=SystemRole.USER,
         is_active=False,
     )
     db.add(user)
@@ -224,7 +225,7 @@ async def list_all_orgs(db: AsyncSession) -> list[dict]:
             User.email.label("owner_email"),
         )
         .join(User, OrgMembership.user_id == User.id)
-        .where(OrgMembership.org_role == "ORG_OWNER")
+        .where(OrgMembership.org_role == OrgRole.OWNER)
         .subquery()
     )
 

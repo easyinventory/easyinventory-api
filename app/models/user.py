@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.roles import SystemRole
 from app.models.base import BaseModel
 
 if TYPE_CHECKING:
@@ -19,7 +20,7 @@ class User(BaseModel):
     )
     email: Mapped[str] = mapped_column(String, nullable=False)
     system_role: Mapped[str] = mapped_column(
-        String, nullable=False, default="SYSTEM_USER"
+        String, nullable=False, default=SystemRole.USER
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 

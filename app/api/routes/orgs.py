@@ -14,6 +14,7 @@ from app.api.deps import (
 )
 from app.core.cognito import invite_cognito_user
 from app.core.database import get_db
+from app.core.roles import OrgRole
 from app.models.user import User
 from app.models.org_membership import OrgMembership
 from app.schemas.org import (
@@ -26,15 +27,12 @@ from app.services import org_service
 
 router = APIRouter(prefix="/api/orgs", tags=["organizations"])
 
-VALID_INVITE_ROLES = ("ORG_ADMIN", "ORG_EMPLOYEE", "ORG_VIEWER")
-
-
 # ── Permission helpers ──
 
 
 def _assert_not_owner(target: OrgMembership, action: str) -> None:
     """Nobody can deactivate/remove/change the owner."""
-    if target.org_role == "ORG_OWNER":
+    if target.org_role == OrgRole.OWNER:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Cannot {action} the organization owner",
@@ -47,7 +45,7 @@ def _assert_admin_hierarchy(
     action: str,
 ) -> None:
     """Admin can't modify another admin — only owner can."""
-    if target_role == "ORG_ADMIN" and actor_role != "ORG_OWNER":
+    if target_role == OrgRole.ADMIN and actor_role != OrgRole.OWNER:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Only the owner can {action} an admin",
@@ -55,20 +53,20 @@ def _assert_admin_hierarchy(
 
 
 def _assert_valid_role(role: str) -> None:
-    if role not in VALID_INVITE_ROLES:
+    if role not in OrgRole.INVITABLE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid role. Must be one of: {', '.join(VALID_INVITE_ROLES)}",
+            detail=f"Invalid role. Must be one of: {', '.join(OrgRole.INVITABLE)}",
         )
 
 
 def _assert_can_assign_role(actor_role: str, target_role: str) -> None:
-    if target_role == "ORG_OWNER":
+    if target_role == OrgRole.OWNER:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot assign ORG_OWNER. Transfer ownership instead.",
         )
-    if target_role == "ORG_ADMIN" and actor_role != "ORG_OWNER":
+    if target_role == OrgRole.ADMIN and actor_role != OrgRole.OWNER:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the owner can assign admin roles",
@@ -139,7 +137,7 @@ async def list_members(
 async def invite_member(
     body: InviteMemberRequest,
     membership: OrgMembership = Depends(
-        require_org_role("ORG_OWNER", "ORG_ADMIN"),
+        require_org_role(OrgRole.OWNER, OrgRole.ADMIN),
     ),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
@@ -201,7 +199,7 @@ async def update_role(
     member_id: uuid.UUID,
     body: UpdateRoleRequest,
     membership: OrgMembership = Depends(
-        require_org_role("ORG_OWNER", "ORG_ADMIN"),
+        require_org_role(OrgRole.OWNER, OrgRole.ADMIN),
     ),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
@@ -223,7 +221,7 @@ async def update_role(
 async def deactivate_member(
     member_id: uuid.UUID,
     membership: OrgMembership = Depends(
-        require_org_role("ORG_OWNER", "ORG_ADMIN"),
+        require_org_role(OrgRole.OWNER, OrgRole.ADMIN),
     ),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
@@ -243,7 +241,7 @@ async def deactivate_member(
 async def activate_member(
     member_id: uuid.UUID,
     membership: OrgMembership = Depends(
-        require_org_role("ORG_OWNER", "ORG_ADMIN"),
+        require_org_role(OrgRole.OWNER, OrgRole.ADMIN),
     ),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
@@ -258,7 +256,7 @@ async def activate_member(
 async def remove_member(
     member_id: uuid.UUID,
     membership: OrgMembership = Depends(
-        require_org_role("ORG_OWNER", "ORG_ADMIN"),
+        require_org_role(OrgRole.OWNER, OrgRole.ADMIN),
     ),
     db: AsyncSession = Depends(get_db),
 ) -> None:
