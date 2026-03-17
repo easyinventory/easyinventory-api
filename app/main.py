@@ -5,20 +5,31 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
+from app.core.bootstrap import run_bootstrap
 from app.core.config import settings
-from app.core.database import engine
+from app.core.database import async_session, engine
 from app.api.routes import health, auth, admin, orgs
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Verify DB connection on startup."""
+    """Verify DB connection and run bootstrap seeder on startup."""
     async with engine.connect() as conn:
         await conn.execute(text("SELECT 1"))
-    print(f"[startup] Database connected")
+    print("[startup] Database connected")
+
+    # Seed bootstrap admin + default org (idempotent)
+    async with async_session() as db:
+        try:
+            await run_bootstrap(db)
+            await db.commit()
+        except Exception as exc:
+            await db.rollback()
+            print(f"[bootstrap] ERROR: {exc}")
+
     yield
     await engine.dispose()
-    print(f"[shutdown] Database disconnected")
+    print("[shutdown] Database disconnected")
 
 
 def create_app() -> FastAPI:
