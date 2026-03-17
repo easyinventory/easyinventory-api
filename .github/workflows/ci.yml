@@ -86,7 +86,7 @@ jobs:
   # Runs on: push to main ONLY (not development, not PRs)
   deploy:
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
 
     steps:
@@ -102,13 +102,14 @@ jobs:
           DB_NAME: ${{ secrets.DB_NAME }}
           COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID }}
           COGNITO_APP_CLIENT_ID: ${{ secrets.COGNITO_APP_CLIENT_ID }}
+          COGNITO_REGION: ${{ secrets.COGNITO_REGION }}
           BOOTSTRAP_ADMIN_EMAIL: ${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}
           CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: AWS_REGION,AWS_ACCOUNT_ID,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,DB_USER,DB_PASSWORD,DB_NAME,COGNITO_USER_POOL_ID,COGNITO_APP_CLIENT_ID,BOOTSTRAP_ADMIN_EMAIL,CORS_ORIGINS
+          envs: AWS_REGION,AWS_ACCOUNT_ID,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,DB_USER,DB_PASSWORD,DB_NAME,COGNITO_REGION,COGNITO_USER_POOL_ID,COGNITO_APP_CLIENT_ID,BOOTSTRAP_ADMIN_EMAIL,CORS_ORIGINS
           script: |
             set -e
             cd ~/easyinventory
@@ -117,7 +118,7 @@ jobs:
               'APP_NAME="EasyInventory API"' \
               "DEBUG=false" \
               "DATABASE_URL=postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}" \
-              "COGNITO_REGION=${AWS_REGION}" \
+              "COGNITO_REGION=${COGNITO_REGION}" \
               "COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}" \
               "COGNITO_APP_CLIENT_ID=${COGNITO_APP_CLIENT_ID}" \
               "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}" \
