@@ -8,6 +8,26 @@ from jose import jwt, JWTError
 
 from app.core.config import settings
 
+# ── Cached Cognito client ──
+
+
+@lru_cache(maxsize=1)
+def _get_cognito_client() -> Any:
+    """
+    Return a cached boto3 cognito-idp client.
+
+    Cached so we don't spin up a new client on every request.
+    """
+    return boto3.client(
+        "cognito-idp",
+        region_name=settings.COGNITO_REGION,
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID or None,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY or None,
+    )
+
+
+# ── JWKS / Token verification ──
+
 
 @lru_cache(maxsize=1)
 def get_jwks() -> dict[str, Any]:
@@ -73,6 +93,36 @@ def verify_token(token: str) -> dict[str, Any]:
     return claims
 
 
+# ── Email lookup from access token ──
+
+
+def get_email_from_access_token(access_token: str) -> str:
+    """
+    Retrieve the user's email from Cognito using an access token.
+
+    Cognito access tokens don't include the email claim (only ID tokens
+    do). This function calls Cognito's GetUser API to look it up.
+
+    Returns the email string, or "" if the lookup fails.
+    """
+    try:
+        client = _get_cognito_client()
+        resp = client.get_user(AccessToken=access_token)
+        return next(
+            (
+                attr["Value"]
+                for attr in resp["UserAttributes"]
+                if attr["Name"] == "email"
+            ),
+            "",
+        )
+    except Exception:
+        return ""
+
+
+# ── User invite ──
+
+
 def invite_cognito_user(email: str) -> bool:
     """
     Create a Cognito user account and send an invite email
@@ -86,12 +136,7 @@ def invite_cognito_user(email: str) -> bool:
 
     Returns True if the user was created, False if they already exist.
     """
-    client = boto3.client(
-        "cognito-idp",
-        region_name=settings.COGNITO_REGION,
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID or None,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY or None,
-    )
+    client = _get_cognito_client()
 
     try:
         client.admin_create_user(
