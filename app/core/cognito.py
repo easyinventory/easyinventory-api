@@ -151,6 +151,12 @@ def invite_cognito_user(email: str) -> bool:
         return True
     except ClientError as e:
         if e.response["Error"]["Code"] == "UsernameExistsException":
-            # User already has a Cognito account — that's fine
+            # User already has a Cognito account — resend the invite email
+            client.admin_create_user(
+                UserPoolId=settings.COGNITO_USER_POOL_ID,
+                Username=email,
+                MessageAction="RESEND",
+                DesiredDeliveryMediums=["EMAIL"],
+            )
             return False
         raise
