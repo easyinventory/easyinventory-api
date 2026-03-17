@@ -3,12 +3,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+import boto3
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cognito import verify_token
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.org_membership import OrgMembership
 from app.models.user import User
@@ -50,10 +52,31 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    email = claims.get("email", "")
+
+    # Cognito access tokens don't include the email claim (only ID tokens do).
+    # Fall back to a get_user call so first-login user creation works correctly.
+    if not email:
+        try:
+            cognito_client = boto3.client(
+                "cognito-idp", region_name=settings.COGNITO_REGION
+            )
+            resp = cognito_client.get_user(AccessToken=token)
+            email = next(
+                (
+                    attr["Value"]
+                    for attr in resp["UserAttributes"]
+                    if attr["Name"] == "email"
+                ),
+                "",
+            )
+        except Exception:
+            pass
+
     user = await get_or_create_user(
         db=db,
         cognito_sub=claims["sub"],
-        email=claims.get("email", ""),
+        email=email,
     )
 
     return user
