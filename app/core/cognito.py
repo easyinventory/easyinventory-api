@@ -12,7 +12,7 @@ from app.core.config import settings
 
 
 @lru_cache(maxsize=1)
-def _get_cognito_client():
+def _get_cognito_client() -> Any:
     """
     Return a cached boto3 cognito-idp client.
 
