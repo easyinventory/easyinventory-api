@@ -1,3 +1,4 @@
+from app.core.roles import SystemRole
 from app.models.user import User
 from app.models.organization import Organization
 from app.models.org_membership import OrgMembership
@@ -16,7 +17,7 @@ def test_org_membership_table_name():
 
 
 def test_user_default_role():
-    assert User.system_role.default.arg == "SYSTEM_USER"
+    assert User.system_role.default.arg == SystemRole.USER
 
 
 def test_user_cognito_sub_is_unique():
