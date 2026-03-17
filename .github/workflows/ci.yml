@@ -1,0 +1,102 @@
+name: API — Test, Build & Deploy
+
+on:
+  push:
+    branches: [development, main]
+  pull_request:
+    branches: [development, main]
+
+env:
+  ECR_REPO: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/easyinventory/api
+
+jobs:
+
+  # ─── Job 1: Lint + Test ───────────────────────────────
+  # Runs on: every push and PR to dev and main
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r dev-requirements.txt
+
+      - name: Lint + Format Check
+        run: |
+          make lint
+          make format-check
+
+      - name: Test
+        env:
+          DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test
+          COGNITO_REGION: us-east-2
+          COGNITO_USER_POOL_ID: test
+          COGNITO_APP_CLIENT_ID: test
+          BOOTSTRAP_ADMIN_EMAIL: ""
+        run: pytest
+
+  # ─── Job 2: Build Docker Image + Push to ECR ─────────
+  # Runs on: push to dev or main (not PRs)
+  build:
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        run: |
+          docker build -f Dockerfile.api \
+            -t $ECR_REPO:latest \
+            -t $ECR_REPO:${{ github.sha }} .
+          docker push $ECR_REPO:latest
+          docker push $ECR_REPO:${{ github.sha }}
+
+  # ─── Job 3: Deploy to EC2 ────────────────────────────
+  # Runs on: push to main ONLY (not dev, not PRs)
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/easyinventory
+            source .env.prod
+            ./deploy.sh
