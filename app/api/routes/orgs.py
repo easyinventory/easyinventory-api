@@ -12,7 +12,6 @@ from app.api.deps import (
     get_current_org_membership,
     require_org_role,
 )
-from app.core.cognito import invite_cognito_user
 from app.core.database import get_db
 from app.core.roles import OrgRole
 from app.models.user import User
@@ -24,6 +23,7 @@ from app.schemas.org import (
     UpdateRoleRequest,
 )
 from app.services import org_service
+from app.services.invite_service import invite_user_to_org
 
 router = APIRouter(prefix="/api/orgs", tags=["organizations"])
 
@@ -142,54 +142,15 @@ async def invite_member(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Invite a user to the org by email."""
-    # ── Permission checks ──
     _assert_valid_role(body.org_role)
     _assert_can_assign_role(membership.org_role, body.org_role)
 
-    # ── Check for existing user ──
-    existing_user = await org_service.find_user_by_email(db, body.email)
-
-    if existing_user:
-        # Check if already a member (active or inactive/pending)
-        existing_membership = await org_service.find_existing_membership(
-            db,
-            membership.org_id,
-            existing_user.id,
-        )
-        if existing_membership:
-            # Distinguish between active member and pending invite
-            if existing_membership.is_active:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="User is already a member of this organization",
-                )
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="This user has already been invited. They will gain access when they sign up.",
-                )
-
-        # Known user, not yet a member → active membership
-        new_membership = await org_service.create_membership(
-            db=db,
-            org_id=membership.org_id,
-            user_id=existing_user.id,
-            org_role=body.org_role,
-            is_active=True,
-        )
-    else:
-        # Unknown email → create Cognito account + send invite email
-        invite_cognito_user(body.email)
-
-        # Create placeholder user + inactive membership
-        placeholder = await org_service.create_placeholder_user(db, body.email)
-        new_membership = await org_service.create_membership(
-            db=db,
-            org_id=membership.org_id,
-            user_id=placeholder.id,
-            org_role=body.org_role,
-            is_active=False,
-        )
+    new_membership = await invite_user_to_org(
+        db=db,
+        org_id=membership.org_id,
+        email=body.email,
+        org_role=body.org_role,
+    )
 
     return await _member_detail(db, new_membership, email=body.email)
 
