@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy import select
@@ -11,6 +11,12 @@ from app.api.deps import (
     get_current_user,
     get_current_org_membership,
     require_org_role,
+)
+from app.api.permissions import (
+    assert_admin_hierarchy,
+    assert_can_assign_role,
+    assert_not_owner,
+    assert_valid_invite_role,
 )
 from app.core.database import get_db
 from app.core.roles import OrgRole
@@ -27,50 +33,8 @@ from app.services.invite_service import invite_user_to_org
 
 router = APIRouter(prefix="/api/orgs", tags=["organizations"])
 
-# ── Permission helpers ──
 
-
-def _assert_not_owner(target: OrgMembership, action: str) -> None:
-    """Nobody can deactivate/remove/change the owner."""
-    if target.org_role == OrgRole.OWNER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Cannot {action} the organization owner",
-        )
-
-
-def _assert_admin_hierarchy(
-    actor_role: str,
-    target_role: str,
-    action: str,
-) -> None:
-    """Admin can't modify another admin — only owner can."""
-    if target_role == OrgRole.ADMIN and actor_role != OrgRole.OWNER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Only the owner can {action} an admin",
-        )
-
-
-def _assert_valid_role(role: str) -> None:
-    if role not in OrgRole.INVITABLE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid role. Must be one of: {', '.join(OrgRole.INVITABLE)}",
-        )
-
-
-def _assert_can_assign_role(actor_role: str, target_role: str) -> None:
-    if target_role == OrgRole.OWNER:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot assign ORG_OWNER. Transfer ownership instead.",
-        )
-    if target_role == OrgRole.ADMIN and actor_role != OrgRole.OWNER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the owner can assign admin roles",
-        )
+# ── Internal helpers ──
 
 
 async def _get_target_or_404(
@@ -81,7 +45,7 @@ async def _get_target_or_404(
     target = await org_service.get_membership_by_id(db, member_id, org_id)
     if not target:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=404,
             detail="Membership not found",
         )
     return target
@@ -142,8 +106,8 @@ async def invite_member(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Invite a user to the org by email."""
-    _assert_valid_role(body.org_role)
-    _assert_can_assign_role(membership.org_role, body.org_role)
+    assert_valid_invite_role(body.org_role)
+    assert_can_assign_role(membership.org_role, body.org_role)
 
     new_membership = await invite_user_to_org(
         db=db,
@@ -167,13 +131,11 @@ async def update_role(
     """Change a member's org role."""
     target = await _get_target_or_404(db, member_id, membership.org_id)
 
-    # ── Permission checks ──
-    _assert_valid_role(body.org_role)
-    _assert_not_owner(target, "change role of")
-    _assert_admin_hierarchy(membership.org_role, target.org_role, "change role of")
-    _assert_can_assign_role(membership.org_role, body.org_role)
+    assert_valid_invite_role(body.org_role)
+    assert_not_owner(target, "change role of")
+    assert_admin_hierarchy(membership.org_role, target.org_role, "change role of")
+    assert_can_assign_role(membership.org_role, body.org_role)
 
-    # ── Business logic ──
     updated = await org_service.update_role(db, target, body.org_role)
     return await _member_detail(db, updated)
 
@@ -189,11 +151,9 @@ async def deactivate_member(
     """Deactivate a member."""
     target = await _get_target_or_404(db, member_id, membership.org_id)
 
-    # ── Permission checks ──
-    _assert_not_owner(target, "deactivate")
-    _assert_admin_hierarchy(membership.org_role, target.org_role, "deactivate")
+    assert_not_owner(target, "deactivate")
+    assert_admin_hierarchy(membership.org_role, target.org_role, "deactivate")
 
-    # ── Business logic ──
     updated = await org_service.set_active_status(db, target, is_active=False)
     return await _member_detail(db, updated)
 
@@ -224,9 +184,7 @@ async def remove_member(
     """Remove a member from the org entirely."""
     target = await _get_target_or_404(db, member_id, membership.org_id)
 
-    # ── Permission checks ──
-    _assert_not_owner(target, "remove")
-    _assert_admin_hierarchy(membership.org_role, target.org_role, "remove")
+    assert_not_owner(target, "remove")
+    assert_admin_hierarchy(membership.org_role, target.org_role, "remove")
 
-    # ── Business logic ──
     await org_service.delete_membership(db, target)
