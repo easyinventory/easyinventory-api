@@ -102,7 +102,7 @@ jobs:
           DB_NAME: ${{ secrets.DB_NAME }}
           COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID }}
           COGNITO_APP_CLIENT_ID: ${{ secrets.COGNITO_APP_CLIENT_ID }}
-          COGNITO_REGION: ${{ secrets.AWS_REGION }}
+          COGNITO_REGION: ${{ secrets.COGNITO_REGION }}
           BOOTSTRAP_ADMIN_EMAIL: ${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}
           CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
         with:
