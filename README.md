@@ -81,6 +81,8 @@ verification and caches them for the process lifetime.
 
 ## Organization Management
 
+> TODO roadmap item: [Multi-Organization Support User Story](docs/multi-org-support-user-story.md)
+
 | Method | Endpoint | Role Required | Description |
 |---|---|---|---|
 | GET | /api/orgs/members | Any org member | List all members |
