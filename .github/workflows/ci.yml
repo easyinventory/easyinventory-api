@@ -83,10 +83,10 @@ jobs:
           docker push $ECR_REPO:${{ github.sha }}
 
   # ─── Job 3: Deploy to EC2 ────────────────────────────
-  # Runs on: push to main ONLY (not dev, not PRs)
+  # Runs on: push to development and main (not PRs)
   deploy:
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/development' || github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
 
     steps:
@@ -111,9 +111,8 @@ jobs:
             cd ~/easyinventory
 
             # Write .env.prod directly from injected secrets (no git clone required)
-            # Write .env.prod directly from injected secrets (no git clone required)
             printf '%s\n' \
-              "APP_NAME=EasyInventory API" \
+              'APP_NAME="EasyInventory API"' \
               "DEBUG=false" \
               "DATABASE_URL=${DATABASE_URL}" \
               "COGNITO_REGION=${AWS_REGION}" \
