@@ -12,7 +12,7 @@ env:
 jobs:
 
   # ─── Job 1: Lint + Test ───────────────────────────────
-  # Runs on: every push and PR to dev and main
+  # Runs on: every push and PR to development and main
   test:
     runs-on: ubuntu-latest
     services:
@@ -40,7 +40,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r dev-requirements.txt
 
-      - name: Lint + Format Check
+      - name: Lint (black + mypy)
         run: |
           make lint
           make format-check
@@ -55,7 +55,7 @@ jobs:
         run: pytest
 
   # ─── Job 2: Build Docker Image + Push to ECR ─────────
-  # Runs on: push to dev or main (not PRs)
+  # Runs on: push to development or main (not PRs)
   build:
     needs: test
     if: github.event_name == 'push'
@@ -83,7 +83,7 @@ jobs:
           docker push $ECR_REPO:${{ github.sha }}
 
   # ─── Job 3: Deploy to EC2 ────────────────────────────
-  # Runs on: push to main ONLY (not dev, not PRs)
+  # Runs on: push to main ONLY (not development, not PRs)
   deploy:
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -93,42 +93,42 @@ jobs:
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1
         env:
-          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
           COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID }}
           COGNITO_APP_CLIENT_ID: ${{ secrets.COGNITO_APP_CLIENT_ID }}
           BOOTSTRAP_ADMIN_EMAIL: ${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}
+          CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: AWS_ACCOUNT_ID,AWS_REGION,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,DATABASE_URL,COGNITO_USER_POOL_ID,COGNITO_APP_CLIENT_ID,BOOTSTRAP_ADMIN_EMAIL
+          envs: AWS_REGION,AWS_ACCOUNT_ID,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,DB_USER,DB_PASSWORD,DB_NAME,COGNITO_USER_POOL_ID,COGNITO_APP_CLIENT_ID,BOOTSTRAP_ADMIN_EMAIL,CORS_ORIGINS
           script: |
             set -e
             cd ~/easyinventory
 
-            # Write .env.prod directly from injected secrets (no git clone required)
-            # Write .env.prod directly from injected secrets (no git clone required)
             printf '%s\n' \
-              "APP_NAME=EasyInventory API" \
+              'APP_NAME="EasyInventory API"' \
               "DEBUG=false" \
-              "DATABASE_URL=${DATABASE_URL}" \
+              "DATABASE_URL=postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}" \
               "COGNITO_REGION=${AWS_REGION}" \
               "COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}" \
               "COGNITO_APP_CLIENT_ID=${COGNITO_APP_CLIENT_ID}" \
               "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}" \
               "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}" \
+              "BOOTSTRAP_ADMIN_EMAIL=${BOOTSTRAP_ADMIN_EMAIL}" \
+              "CORS_ORIGINS=${CORS_ORIGINS}" \
+              "DB_USER=${DB_USER}" \
+              "DB_PASSWORD=${DB_PASSWORD}" \
+              "DB_NAME=${DB_NAME}" \
               "AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}" \
               "AWS_REGION=${AWS_REGION}" \
-              "BOOTSTRAP_ADMIN_EMAIL=${BOOTSTRAP_ADMIN_EMAIL}" \
               > .env.prod
 
-            source .env.prod
-            aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-            docker compose -f docker-compose.prod.yml --env-file .env.prod pull api
-            docker compose -f docker-compose.prod.yml --env-file .env.prod up -d api
-            docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T api alembic upgrade head
-            docker image prune -f
+            ./deploy.sh
