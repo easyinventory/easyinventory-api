@@ -5,6 +5,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr
 
+from app.core.roles import OrgRole
+
 
 class OrgResponse(BaseModel):
     id: uuid.UUID
@@ -40,7 +42,7 @@ class OrgMemberDetail(BaseModel):
 
 class InviteMemberRequest(BaseModel):
     email: EmailStr
-    org_role: str = "ORG_EMPLOYEE"
+    org_role: str = OrgRole.EMPLOYEE
 
 
 class UpdateRoleRequest(BaseModel):
