@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_role
 from app.core.cognito import invite_cognito_user
 from app.core.database import get_db
+from app.core.roles import OrgRole, SystemRole
 from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.admin import CreateOrgRequest, OrgListItem
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 @router.get("/status")
 async def admin_status(
-    user: User = Depends(require_role("SYSTEM_ADMIN")),
+    user: User = Depends(require_role(SystemRole.ADMIN)),
 ) -> dict:
     """
     Admin-only endpoint for testing role enforcement.
@@ -32,7 +33,7 @@ async def admin_status(
 @router.post("/orgs", response_model=OrgListItem, status_code=201)
 async def create_org(
     body: CreateOrgRequest,
-    current_user: User = Depends(require_role("SYSTEM_ADMIN")),
+    current_user: User = Depends(require_role(SystemRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """
@@ -63,7 +64,7 @@ async def create_org(
             db=db,
             org_id=org.id,
             user_id=user.id,
-            org_role="ORG_OWNER",
+            org_role=OrgRole.OWNER,
             is_active=True,
         )
     else:
@@ -74,7 +75,7 @@ async def create_org(
             db=db,
             org_id=org.id,
             user_id=placeholder.id,
-            org_role="ORG_OWNER",
+            org_role=OrgRole.OWNER,
             is_active=False,
         )
 
@@ -89,7 +90,7 @@ async def create_org(
 
 @router.get("/orgs", response_model=list[OrgListItem])
 async def list_orgs(
-    current_user: User = Depends(require_role("SYSTEM_ADMIN")),
+    current_user: User = Depends(require_role(SystemRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict]:
     """List all organizations. System admin only."""
