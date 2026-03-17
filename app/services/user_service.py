@@ -1,11 +1,21 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.roles import SystemRole
 from app.models.user import User
 from app.models.org_membership import OrgMembership
+
+
+async def delete_user_completely(
+    db: AsyncSession,
+    user: User,
+) -> None:
+    """Delete a user and all their org memberships from the local DB."""
+    await db.execute(delete(OrgMembership).where(OrgMembership.user_id == user.id))
+    await db.delete(user)
+    await db.flush()
 
 
 async def get_or_create_user(

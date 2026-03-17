@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Depends
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_role
+from app.core.cognito import delete_cognito_user
 from app.core.database import get_db
 from app.core.roles import OrgRole, SystemRole
 from app.models.organization import Organization
@@ -9,6 +12,7 @@ from app.models.user import User
 from app.schemas.admin import CreateOrgRequest, OrgListItem
 from app.services import org_service
 from app.services.invite_service import invite_user_to_org
+from app.services.user_service import delete_user_completely
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -70,3 +74,23 @@ async def list_orgs(
 ) -> list[dict]:
     """List all organizations. System admin only."""
     return await org_service.list_all_orgs(db)
+
+
+@router.delete("/users/{user_id}", status_code=204)
+async def delete_user(
+    user_id: uuid.UUID,
+    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Delete a user from the local system and Cognito."""
+    target = await org_service.get_user_by_id(db, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if target.id == current_user.id:
+        raise HTTPException(
+            status_code=400, detail="You cannot delete your own account"
+        )
+
+    await delete_user_completely(db, target)
+    delete_cognito_user(target.email, target.cognito_sub)

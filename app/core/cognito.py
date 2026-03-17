@@ -160,3 +160,32 @@ def invite_cognito_user(email: str) -> bool:
             )
             return False
         raise
+
+
+# ── User deletion ──
+
+
+def delete_cognito_user(email: str, cognito_sub: str) -> None:
+    """
+    Delete a Cognito user account.
+
+    We first try email (most pools use email as username), then fall back
+    to cognito_sub for environments configured differently.
+    """
+    client = _get_cognito_client()
+
+    candidate_usernames = [email]
+    if cognito_sub and not cognito_sub.startswith("pending:"):
+        candidate_usernames.append(cognito_sub)
+
+    for username in candidate_usernames:
+        try:
+            client.admin_delete_user(
+                UserPoolId=settings.COGNITO_USER_POOL_ID,
+                Username=username,
+            )
+            return
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "UserNotFoundException":
+                continue
+            raise
