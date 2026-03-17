@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     # Bootstrap (PR-06)
     BOOTSTRAP_ADMIN_EMAIL: str = ""
+    BOOTSTRAP_ORG_NAME: str = "Default Organization"
 
     # CORS
     CORS_ORIGINS: str = "http://localhost:5173"

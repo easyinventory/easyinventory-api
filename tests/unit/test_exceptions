@@ -1,0 +1,84 @@
+"""Tests for app.core.exceptions."""
+
+import pytest
+
+from app.core.exceptions import (
+    AppError,
+    NotAuthenticated,
+    InsufficientPermission,
+    NotFound,
+    AlreadyExists,
+    OwnerProtected,
+    AdminHierarchyViolation,
+    InvalidRole,
+)
+
+
+def test_app_error_defaults():
+    err = AppError("something broke")
+    assert err.detail == "something broke"
+    assert err.status_code == 400
+    assert str(err) == "something broke"
+
+
+def test_app_error_custom_status():
+    err = AppError("conflict", status_code=409)
+    assert err.status_code == 409
+
+
+def test_not_authenticated():
+    err = NotAuthenticated()
+    assert err.status_code == 401
+    assert "authenticated" in err.detail.lower()
+
+
+def test_insufficient_permission():
+    err = InsufficientPermission()
+    assert err.status_code == 403
+
+
+def test_not_found():
+    err = NotFound("User not found")
+    assert err.status_code == 404
+    assert err.detail == "User not found"
+
+
+def test_already_exists():
+    err = AlreadyExists("Duplicate email")
+    assert err.status_code == 400
+    assert err.detail == "Duplicate email"
+
+
+def test_owner_protected():
+    err = OwnerProtected("deactivate")
+    assert err.status_code == 403
+    assert "deactivate" in err.detail
+    assert "owner" in err.detail.lower()
+
+
+def test_admin_hierarchy_violation():
+    err = AdminHierarchyViolation("remove")
+    assert err.status_code == 403
+    assert "owner" in err.detail.lower()
+    assert "remove" in err.detail
+
+
+def test_invalid_role():
+    err = InvalidRole("Must be one of: ADMIN, EMPLOYEE, VIEWER")
+    assert err.status_code == 400
+
+
+def test_inheritance_chain():
+    """All exceptions inherit from AppError for the handler."""
+    assert issubclass(NotAuthenticated, AppError)
+    assert issubclass(InsufficientPermission, AppError)
+    assert issubclass(NotFound, AppError)
+    assert issubclass(AlreadyExists, AppError)
+    assert issubclass(OwnerProtected, InsufficientPermission)
+    assert issubclass(AdminHierarchyViolation, InsufficientPermission)
+    assert issubclass(InvalidRole, AppError)
+
+
+def test_app_error_is_catchable_as_exception():
+    with pytest.raises(Exception):
+        raise AppError("test")

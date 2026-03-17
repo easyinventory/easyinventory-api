@@ -6,57 +6,10 @@ from typing import Optional
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.roles import OrgRole, SystemRole
 from app.models.organization import Organization
 from app.models.org_membership import OrgMembership
 from app.models.user import User
-
-
-async def create_default_org(
-    db: AsyncSession,
-    owner_id: uuid.UUID,
-) -> Organization:
-    """
-    Create the default organization and add the user as ORG_OWNER.
-
-    Called once during bootstrap admin's first login. If the admin
-    already has an org membership, this is a no-op.
-
-    Args:
-        db: Active database session
-        owner_id: The bootstrap admin's user ID
-
-    Returns:
-        The created or existing Organization
-    """
-    # Check if this user already has any org membership
-    stmt = select(OrgMembership).where(OrgMembership.user_id == owner_id)
-    result = await db.execute(stmt)
-    existing = result.scalar_one_or_none()
-
-    if existing is not None:
-        # Already has an org — fetch and return it
-        org_stmt = select(Organization).where(Organization.id == existing.org_id)
-        org_result = await db.execute(org_stmt)
-        org: Organization | None = org_result.scalar_one_or_none()
-        if org is not None:
-            return org
-
-    # Create the org
-    org = Organization(name="Default Organization")
-    db.add(org)
-    await db.flush()
-
-    # Add the admin as owner
-    membership = OrgMembership(
-        org_id=org.id,
-        user_id=owner_id,
-        org_role="ORG_OWNER",
-    )
-    db.add(membership)
-    await db.flush()
-
-    return org
-
 
 # ── New: member management ──
 
@@ -153,7 +106,7 @@ async def create_placeholder_user(
     user = User(
         cognito_sub=f"pending:{email}",
         email=email,
-        system_role="SYSTEM_USER",
+        system_role=SystemRole.USER,
         is_active=False,
     )
     db.add(user)
@@ -224,7 +177,7 @@ async def list_all_orgs(db: AsyncSession) -> list[dict]:
             User.email.label("owner_email"),
         )
         .join(User, OrgMembership.user_id == User.id)
-        .where(OrgMembership.org_role == "ORG_OWNER")
+        .where(OrgMembership.org_role == OrgRole.OWNER)
         .subquery()
     )
 
