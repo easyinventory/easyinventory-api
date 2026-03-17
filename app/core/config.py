@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     # Bootstrap (PR-06)
     BOOTSTRAP_ADMIN_EMAIL: str = ""
 
+    # CORS
+    CORS_ORIGINS: str = "http://localhost:5173"
+
+    def get_cors_origins(self) -> list[str]:
+        return [o.strip() for o in self.CORS_ORIGINS.split(",")]
+
     class Config:
         env_file = ".env"
 
