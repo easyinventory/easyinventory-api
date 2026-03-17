@@ -2,9 +2,9 @@ name: API — Test, Build & Deploy
 
 on:
   push:
-    branches: [development, main]
+    branches: [development, main, fix-multi-org-bug]
   pull_request:
-    branches: [development, main]
+    branches: [development, main, fix-multi-org-bug]
 
 env:
   ECR_REPO: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/easyinventory/api
@@ -86,7 +86,7 @@ jobs:
   # Runs on: push to main ONLY (not development, not PRs)
   deploy:
     needs: build
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix-multi-org-bug')
     runs-on: ubuntu-latest
 
     steps:
