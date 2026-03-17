@@ -1,16 +1,19 @@
-from collections.abc import AsyncGenerator
+import logging
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import text
 
+from app.api.routes import admin, auth, health, orgs
 from app.core.bootstrap import run_bootstrap
 from app.core.config import settings
 from app.core.database import async_session, engine
 from app.core.exceptions import AppError
-from app.api.routes import health, auth, admin, orgs
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -49,6 +52,29 @@ def create_app() -> FastAPI:
             status_code=exc.status_code,
             content={"detail": exc.detail},
         )
+
+    # ── Catch-all for unhandled exceptions ──
+    # IMPORTANT: this must be registered *before* add_middleware(CORSMiddleware).
+    # Starlette's build_middleware_stack puts middlewares in reverse-add order, so
+    # the last-added middleware is outermost.  By registering this catch-all first
+    # and CORSMiddleware second, the stack becomes:
+    #   ServerErrorMiddleware → CORSMiddleware → catch_all → ExceptionMiddleware → router
+    # Every response — including 500s — therefore flows through CORSMiddleware and
+    # always carries the correct Access-Control-Allow-Origin header.
+    # (Using @app.exception_handler(Exception) instead would send the handler to
+    # ServerErrorMiddleware, which is *outside* CORSMiddleware.)
+    @app.middleware("http")
+    async def catch_unhandled_exceptions(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        try:
+            return await call_next(request)
+        except Exception as exc:
+            logger.exception("Unhandled exception: %s", exc)
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "Internal server error"},
+            )
 
     app.add_middleware(
         CORSMiddleware,

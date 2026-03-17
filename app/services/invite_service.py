@@ -8,7 +8,9 @@ a single, testable service function.
 
 from __future__ import annotations
 
+import asyncio
 import uuid
+from functools import partial
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -74,7 +76,10 @@ async def invite_user_to_org(
         )
 
     # Unknown email → Cognito invite + placeholder + inactive membership
-    invite_cognito_user(email)
+    # invite_cognito_user is a blocking boto3 call; run it in a thread-pool
+    # executor so it doesn't stall the async event loop.
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, partial(invite_cognito_user, email))
     placeholder = await org_service.create_placeholder_user(db, email)
     return await org_service.create_membership(
         db=db,
