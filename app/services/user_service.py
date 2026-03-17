@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.roles import SystemRole
 from app.models.user import User
 from app.models.org_membership import OrgMembership
 from app.services.org_service import create_default_org
@@ -56,7 +57,7 @@ async def get_or_create_user(
 
     # 3. Brand new user — no placeholder exists
     is_admin = _is_bootstrap_admin(email)
-    role = "SYSTEM_ADMIN" if is_admin else "SYSTEM_USER"
+    role = SystemRole.ADMIN if is_admin else SystemRole.USER
 
     user = User(
         cognito_sub=cognito_sub,
