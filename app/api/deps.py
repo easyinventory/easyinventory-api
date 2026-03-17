@@ -106,9 +106,11 @@ async def get_current_org_membership(
         select(OrgMembership)
         .where(OrgMembership.user_id == current_user.id)
         .where(OrgMembership.is_active == True)  # noqa: E712
+        .order_by(OrgMembership.joined_at.desc(), OrgMembership.created_at.desc())
+        .limit(1)
     )
     result = await db.execute(stmt)
-    membership = result.scalar_one_or_none()
+    membership = result.scalars().first()
 
     if membership is None:
         raise HTTPException(
