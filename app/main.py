@@ -1,3 +1,5 @@
+import logging
+import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -10,7 +12,14 @@ from app.core.bootstrap import run_bootstrap
 from app.core.config import settings
 from app.core.database import async_session, engine
 from app.core.exceptions import AppError
+from app.core.middleware import JsonFormatter, RequestLoggingMiddleware
 from app.api.routes import health, auth, admin, orgs, suppliers, products
+
+# ── Structured JSON logging to stdout → Docker → CloudWatch ──
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(JsonFormatter())
+logging.basicConfig(level=logging.INFO, handlers=[handler])
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -18,7 +27,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Verify DB connection and run bootstrap seeder on startup."""
     async with engine.connect() as conn:
         await conn.execute(text("SELECT 1"))
-    print("[startup] Database connected")
+    logger.info("Database connected")
 
     # Seed bootstrap admin + default org (idempotent)
     async with async_session() as db:
@@ -27,11 +36,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             await db.commit()
         except Exception as exc:
             await db.rollback()
-            print(f"[bootstrap] ERROR: {exc}")
+            logger.error("Bootstrap failed: %s", exc)
 
     yield
     await engine.dispose()
-    print("[shutdown] Database disconnected")
+    logger.info("Database disconnected")
 
 
 def create_app() -> FastAPI:
@@ -57,6 +66,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(RequestLoggingMiddleware)
 
     app.include_router(health.router)
     app.include_router(auth.router)

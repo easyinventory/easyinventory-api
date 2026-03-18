@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    APP_NAME: str = "EasyInventory API"
+    APP_NAME: str = "EZInventory API"
     DEBUG: bool = False
     API_PREFIX: str = "/api"
 
