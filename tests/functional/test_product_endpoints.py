@@ -53,6 +53,7 @@ def _mock_product_supplier(product_id=None, supplier_id=None, is_active=True):
     mock.is_active = is_active
     mock.created_at = _NOW
     mock.updated_at = _NOW
+    mock.supplier_name = "Test Supplier"
 
     supplier_mock = MagicMock(spec=Supplier)
     supplier_mock.name = "Test Supplier"
@@ -101,7 +102,7 @@ async def test_get_product_returns_200(app, client):
     assert response.status_code == 200
     data = response.json()
     assert data["name"] == "Test Product"
-    assert data["suppliers"] == []
+    assert data["product_suppliers"] == []
 
 
 async def test_get_nonexistent_product_returns_404(app, client):

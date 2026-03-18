@@ -67,3 +67,8 @@ class ProductSupplier(Base):
         "Supplier",
         lazy="selectin",
     )
+
+    @property
+    def supplier_name(self) -> str:
+        """Expose supplier name for Pydantic serialization."""
+        return self.supplier.name if self.supplier else "Unknown"

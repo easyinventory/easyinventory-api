@@ -17,7 +17,6 @@ from app.schemas.product import (
     ProductSupplierAdd,
     ProductSupplierUpdate,
     ProductSupplierResponse,
-    ProductSupplierInfo,
 )
 from app.services import product_service
 
@@ -41,46 +40,6 @@ async def _get_product_or_404(
     return product
 
 
-def _build_product_response(product: Product) -> ProductResponse:
-    """Build a ProductResponse with nested supplier info."""
-    suppliers = []
-    for ps in product.product_suppliers or []:
-        suppliers.append(
-            ProductSupplierInfo(
-                id=ps.id,
-                supplier_id=ps.supplier_id,
-                supplier_name=ps.supplier.name if ps.supplier else "Unknown",
-                is_active=ps.is_active,
-                created_at=ps.created_at,
-                updated_at=ps.updated_at,
-            )
-        )
-    return ProductResponse(
-        id=product.id,
-        org_id=product.org_id,
-        name=product.name,
-        description=product.description,
-        sku=product.sku,
-        category=product.category,
-        created_at=product.created_at,
-        updated_at=product.updated_at,
-        suppliers=suppliers,
-    )
-
-
-def _build_ps_response(link) -> ProductSupplierResponse:  # type: ignore[no-untyped-def]
-    """Build a ProductSupplierResponse from a ProductSupplier ORM object."""
-    return ProductSupplierResponse(
-        id=link.id,
-        product_id=link.product_id,
-        supplier_id=link.supplier_id,
-        supplier_name=link.supplier.name if link.supplier else None,
-        is_active=link.is_active,
-        created_at=link.created_at,
-        updated_at=link.updated_at,
-    )
-
-
 # ── Product CRUD ──
 
 
@@ -101,7 +60,7 @@ async def get_product(
 ) -> ProductResponse:
     """Get a single product with its suppliers."""
     product = await _get_product_or_404(db, product_id, membership.org_id)
-    return _build_product_response(product)
+    return ProductResponse.model_validate(product)
 
 
 @router.post("", response_model=ProductResponse, status_code=201)
@@ -119,7 +78,7 @@ async def create_product(
         sku=body.sku,
         category=body.category,
     )
-    return _build_product_response(product)
+    return ProductResponse.model_validate(product)
 
 
 @router.put("/{product_id}", response_model=ProductResponse)
@@ -139,7 +98,7 @@ async def update_product(
         sku=body.sku,
         category=body.category,
     )
-    return _build_product_response(product)
+    return ProductResponse.model_validate(product)
 
 
 @router.delete("/{product_id}", status_code=204)
@@ -170,7 +129,7 @@ async def list_product_suppliers(
     # Ensure the product belongs to the org
     await _get_product_or_404(db, product_id, membership.org_id)
     links = await product_service.list_product_suppliers(db, product_id)
-    return [_build_ps_response(link) for link in links]
+    return [ProductSupplierResponse.model_validate(link) for link in links]
 
 
 @router.post(
@@ -211,7 +170,7 @@ async def add_supplier_to_product(
     link = await product_service.add_supplier_to_product(
         db, product_id, body.supplier_id
     )
-    return _build_ps_response(link)
+    return ProductSupplierResponse.model_validate(link)
 
 
 @router.patch(
@@ -236,7 +195,7 @@ async def update_product_supplier(
         )
 
     link = await product_service.update_product_supplier_link(db, link, body.is_active)
-    return _build_ps_response(link)
+    return ProductSupplierResponse.model_validate(link)
 
 
 @router.delete(

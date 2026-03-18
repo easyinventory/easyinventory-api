@@ -45,7 +45,7 @@ class ProductResponse(BaseModel):
     category: Optional[str]
     created_at: datetime
     updated_at: datetime
-    suppliers: list[ProductSupplierInfo] = []
+    product_suppliers: list[ProductSupplierInfo] = []
 
     model_config = {"from_attributes": True}
 
