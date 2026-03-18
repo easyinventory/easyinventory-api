@@ -79,7 +79,9 @@ async def test_get_current_org_membership_returns_first_active_membership():
     mock_db.execute.return_value = mock_result
 
     membership = await get_current_org_membership(
-        current_user=mock_user, db=mock_db, x_org_id=None,
+        current_user=mock_user,
+        db=mock_db,
+        x_org_id=None,
     )
 
     assert membership is mock_membership
@@ -101,7 +103,9 @@ async def test_get_current_org_membership_raises_403_when_missing():
 
     with pytest.raises(HTTPException) as exc_info:
         await get_current_org_membership(
-            current_user=mock_user, db=mock_db, x_org_id=None,
+            current_user=mock_user,
+            db=mock_db,
+            x_org_id=None,
         )
 
     assert exc_info.value.status_code == 403
