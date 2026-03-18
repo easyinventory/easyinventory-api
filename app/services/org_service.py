@@ -239,9 +239,7 @@ async def delete_org(
     org: Organization,
 ) -> None:
     """Delete an organization and all its memberships."""
-    await db.execute(
-        delete(OrgMembership).where(OrgMembership.org_id == org.id)
-    )
+    await db.execute(delete(OrgMembership).where(OrgMembership.org_id == org.id))
     await db.delete(org)
     await db.flush()
 
@@ -265,9 +263,7 @@ async def transfer_ownership(
     # Find their membership in this org
     new_owner_membership = await find_existing_membership(db, org_id, new_owner.id)
     if not new_owner_membership:
-        raise NotFound(
-            f"User {new_owner_email} is not a member of this organization"
-        )
+        raise NotFound(f"User {new_owner_email} is not a member of this organization")
 
     # Find current owner
     stmt = (
@@ -288,3 +284,46 @@ async def transfer_ownership(
     new_owner_membership.org_role = OrgRole.OWNER
     await db.flush()
     return new_owner_membership
+
+
+# ── User management (System Admin) ──
+
+
+async def list_all_users(db: AsyncSession) -> list[dict]:
+    """List all users with their active org count."""
+    org_count_sq = (
+        select(
+            OrgMembership.user_id,
+            func.count(OrgMembership.id).label("org_count"),
+        )
+        .where(OrgMembership.is_active == True)  # noqa: E712
+        .group_by(OrgMembership.user_id)
+        .subquery()
+    )
+
+    stmt = (
+        select(
+            User.id,
+            User.email,
+            User.system_role,
+            User.is_active,
+            User.created_at,
+            func.coalesce(org_count_sq.c.org_count, 0).label("org_count"),
+        )
+        .outerjoin(org_count_sq, User.id == org_count_sq.c.user_id)
+        .order_by(User.created_at.desc())
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    return [
+        {
+            "id": row.id,
+            "email": row.email,
+            "system_role": row.system_role,
+            "is_active": row.is_active,
+            "created_at": row.created_at,
+            "org_count": row.org_count,
+        }
+        for row in rows
+    ]

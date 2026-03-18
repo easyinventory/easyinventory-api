@@ -14,6 +14,7 @@ from app.schemas.admin import (
     OrgListItem,
     TransferOwnershipRequest,
     UpdateOrgRequest,
+    UserListItem,
 )
 from app.schemas.org import OrgMemberDetail
 from app.services import org_service
@@ -146,7 +147,9 @@ async def transfer_ownership(
     await _get_org_or_404(db, org_id)
 
     new_owner_membership = await org_service.transfer_ownership(
-        db, org_id, body.new_owner_email,
+        db,
+        org_id,
+        body.new_owner_email,
     )
 
     user = await org_service.get_user_by_id(db, new_owner_membership.user_id)
@@ -160,7 +163,30 @@ async def transfer_ownership(
     }
 
 
+# ── Org member introspection ──
+
+
+@router.get("/orgs/{org_id}/members", response_model=list[OrgMemberDetail])
+async def list_org_members(
+    org_id: uuid.UUID,
+    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    """List all members of a specific org. System admin only."""
+    await _get_org_or_404(db, org_id)
+    return await org_service.list_org_members(db=db, org_id=org_id)
+
+
 # ── User management ──
+
+
+@router.get("/users", response_model=list[UserListItem])
+async def list_users(
+    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    """List all users across all orgs. System admin only."""
+    return await org_service.list_all_users(db)
 
 
 @router.delete("/users/{user_id}", status_code=204)
