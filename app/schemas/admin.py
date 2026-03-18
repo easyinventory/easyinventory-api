@@ -19,3 +19,17 @@ class OrgListItem(BaseModel):
     member_count: int
 
     model_config = {"from_attributes": True}
+
+
+# ── User schemas (admin) ──
+
+
+class UserListItem(BaseModel):
+    id: uuid.UUID
+    email: str
+    system_role: str
+    is_active: bool
+    created_at: datetime
+    org_count: int = 0
+
+    model_config = {"from_attributes": True}
