@@ -70,6 +70,7 @@ async def create_product(
     db: AsyncSession = Depends(get_db),
 ) -> ProductResponse:
     """Create a new product."""
+
     product = await product_service.create_product(
         db=db,
         org_id=membership.org_id,
