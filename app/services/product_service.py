@@ -57,6 +57,7 @@ async def create_product(
     )
     db.add(product)
     await db.flush()
+    await db.refresh(product, ["product_suppliers"])
     return product
 
 
