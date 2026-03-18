@@ -10,6 +10,13 @@ services:
       - pgdata:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:5432:5432"
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: /easyinventory/db
+        awslogs-stream: db
+        awslogs-create-group: "true"
 
   api:
     image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/easyinventory/api:latest
@@ -23,16 +30,28 @@ services:
       COGNITO_APP_CLIENT_ID: ${COGNITO_APP_CLIENT_ID}
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL}
       CORS_ORIGINS: ${CORS_ORIGINS}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
     ports:
       - "127.0.0.1:8000:8000"
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: /easyinventory/api
+        awslogs-stream: api
+        awslogs-create-group: "true"
 
   web:
     image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/easyinventory/web:latest
     restart: always
     ports:
       - "127.0.0.1:3000:3000"
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: /easyinventory/web
+        awslogs-stream: web
+        awslogs-create-group: "true"
 
   caddy:
     image: caddy:2-alpine
@@ -47,6 +66,13 @@ services:
     depends_on:
       - api
       - web
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: /easyinventory/caddy
+        awslogs-stream: caddy
+        awslogs-create-group: "true"
 
 volumes:
   pgdata:

@@ -1,3 +1,5 @@
+import logging
+import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -12,13 +14,21 @@ from app.core.database import async_session, engine
 from app.core.exceptions import AppError
 from app.api.routes import health, auth, admin, orgs, suppliers, products
 
+# ── Logging to stdout/stderr so Docker logging drivers capture everything ──
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Verify DB connection and run bootstrap seeder on startup."""
     async with engine.connect() as conn:
         await conn.execute(text("SELECT 1"))
-    print("[startup] Database connected")
+    logger.info("Database connected")
 
     # Seed bootstrap admin + default org (idempotent)
     async with async_session() as db:
@@ -27,11 +37,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             await db.commit()
         except Exception as exc:
             await db.rollback()
-            print(f"[bootstrap] ERROR: {exc}")
+            logger.error("Bootstrap failed: %s", exc)
 
     yield
     await engine.dispose()
-    print("[shutdown] Database disconnected")
+    logger.info("Database disconnected")
 
 
 def create_app() -> FastAPI:
