@@ -9,12 +9,25 @@ from app.core.database import get_db
 from app.core.roles import OrgRole, SystemRole
 from app.models.organization import Organization
 from app.models.user import User
-from app.schemas.admin import CreateOrgRequest, OrgListItem
+from app.schemas.admin import CreateOrgRequest, OrgListItem, UserListItem
+from app.schemas.org import OrgMemberDetail
 from app.services import org_service
 from app.services.invite_service import invite_user_to_org
 from app.services.user_service import delete_user_completely
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+# ── Helpers ──
+
+
+async def _get_org_or_404(
+    db: AsyncSession,
+    org_id: uuid.UUID,
+) -> None:
+    org = await org_service.get_org_by_id(db, org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
 
 
 @router.get("/status")
@@ -74,6 +87,32 @@ async def list_orgs(
 ) -> list[dict]:
     """List all organizations. System admin only."""
     return await org_service.list_all_orgs(db)
+
+
+# ── Org member introspection ──
+
+
+@router.get("/orgs/{org_id}/members", response_model=list[OrgMemberDetail])
+async def list_org_members(
+    org_id: uuid.UUID,
+    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    """List all members of a specific org. System admin only."""
+    await _get_org_or_404(db, org_id)
+    return await org_service.list_org_members(db=db, org_id=org_id)
+
+
+# ── User management ──
+
+
+@router.get("/users", response_model=list[UserListItem])
+async def list_users(
+    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    """List all users across all orgs. System admin only."""
+    return await org_service.list_all_users(db)
 
 
 @router.delete("/users/{user_id}", status_code=204)
