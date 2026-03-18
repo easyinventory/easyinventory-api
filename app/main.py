@@ -10,7 +10,7 @@ from app.core.bootstrap import run_bootstrap
 from app.core.config import settings
 from app.core.database import async_session, engine
 from app.core.exceptions import AppError
-from app.api.routes import health, auth, admin, orgs, suppliers
+from app.api.routes import health, auth, admin, orgs, suppliers, products
 
 
 @asynccontextmanager
@@ -63,6 +63,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router)
     app.include_router(orgs.router)
     app.include_router(suppliers.router)
+    app.include_router(products.router)
 
     return app
 
