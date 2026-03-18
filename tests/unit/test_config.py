@@ -9,7 +9,7 @@ def test_default_app_name():
         COGNITO_APP_CLIENT_ID="",
         BOOTSTRAP_ADMIN_EMAIL="",
     )
-    assert s.APP_NAME == "EasyInventory API"
+    assert s.APP_NAME == "EZInventory API"
 
 
 def test_default_debug_is_false():
