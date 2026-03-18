@@ -129,6 +129,35 @@ creates the org membership (no duplicate Cognito account).
 All supplier data is scoped to the current user's org. You can
 only see and manage suppliers belonging to your organization.
 
+## Products
+
+| Method | Endpoint | Role Required | Description |
+|---|---|---|---|
+| GET | /api/products | Any org member | List products |
+| GET | /api/products/{id} | Any org member | Get product (with suppliers) |
+| POST | /api/products | Any org member | Create product |
+| PUT | /api/products/{id} | Any org member | Update product |
+| DELETE | /api/products/{id} | ORG_OWNER, ORG_ADMIN | Delete product |
+
+All product data is scoped to the current user's org.
+
+### Product-Supplier Links
+
+Each product can have multiple suppliers. The `is_active` flag on a
+link lets you deactivate a supplier for one product without affecting
+their status on other products (e.g. stop using Supplier X for apples
+but keep them for oranges).
+
+| Method | Endpoint | Role Required | Description |
+|---|---|---|---|
+| GET | /api/products/{id}/suppliers | Any org member | List linked suppliers |
+| POST | /api/products/{id}/suppliers | Any org member | Link a supplier |
+| PATCH | /api/products/{id}/suppliers/{supplier_id} | Any org member | Toggle is_active |
+| DELETE | /api/products/{id}/suppliers/{supplier_id} | Any org member | Remove link |
+
+- Duplicate links return **409 Conflict**.
+- The supplier must belong to the same org as the product.
+
 ## System Admin — Organization Management
 
 | Method | Endpoint | Role Required | Description |
@@ -226,10 +255,13 @@ app/
 │   └── database.py      # SQLAlchemy engine, session, get_db dependency
 ├── api/routes/          # Route handlers (one file per feature)
 ├── models/
-│   ├── base.py          # Abstract base model (UUID pk + created_at)
-│   ├── user.py          # User model (cognito_sub, system_role)
-│   ├── organization.py  # Organization model
-│   └── org_membership.py # Org membership with role + FKs
+│   ├── base.py              # Abstract base model (UUID pk + created_at)
+│   ├── user.py              # User model (cognito_sub, system_role)
+│   ├── organization.py      # Organization model
+│   ├── org_membership.py    # Org membership with role + FKs
+│   ├── supplier.py          # Supplier model (org-scoped)
+│   ├── product.py           # Product model (org-scoped)
+│   └── product_supplier.py  # Product ↔ Supplier join table (is_active)
 ├── schemas/             # Pydantic request/response schemas
 └── services/            # Business logic layer
 alembic/
