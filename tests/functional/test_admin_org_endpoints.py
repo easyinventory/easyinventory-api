@@ -170,3 +170,74 @@ async def test_list_orgs_returns_403_for_non_admin(client):
                 headers={"Authorization": "Bearer fake"},
             )
     assert response.status_code == 403
+
+
+async def test_admin_can_delete_user_system_and_cognito(client):
+    admin = _mock_admin()
+    target = MagicMock(spec=User)
+    target.id = uuid.uuid4()
+    target.email = "delete.me@test.com"
+    target.cognito_sub = "sub-delete-me"
+
+    with patch(
+        "app.api.deps.verify_token",
+        return_value={"sub": "abc", "email": admin.email},
+    ):
+        with patch("app.api.deps.get_or_create_user", return_value=admin):
+            with patch(
+                "app.api.routes.admin.org_service.get_user_by_id", return_value=target
+            ):
+                with patch(
+                    "app.api.routes.admin.delete_user_completely",
+                    new_callable=AsyncMock,
+                ) as mock_delete_db:
+                    with patch(
+                        "app.api.routes.admin.delete_cognito_user"
+                    ) as mock_delete_cognito:
+                        response = await client.delete(
+                            f"/api/admin/users/{target.id}",
+                            headers={"Authorization": "Bearer fake"},
+                        )
+
+    assert response.status_code == 204
+    mock_delete_db.assert_awaited_once()
+    mock_delete_cognito.assert_called_once_with(target.email, target.cognito_sub)
+
+
+async def test_admin_delete_user_returns_404_for_missing_user(client):
+    admin = _mock_admin()
+    missing_id = uuid.uuid4()
+
+    with patch(
+        "app.api.deps.verify_token",
+        return_value={"sub": "abc", "email": admin.email},
+    ):
+        with patch("app.api.deps.get_or_create_user", return_value=admin):
+            with patch(
+                "app.api.routes.admin.org_service.get_user_by_id", return_value=None
+            ):
+                response = await client.delete(
+                    f"/api/admin/users/{missing_id}",
+                    headers={"Authorization": "Bearer fake"},
+                )
+
+    assert response.status_code == 404
+
+
+async def test_admin_cannot_delete_own_account(client):
+    admin = _mock_admin()
+
+    with patch(
+        "app.api.deps.verify_token",
+        return_value={"sub": "abc", "email": admin.email},
+    ):
+        with patch("app.api.deps.get_or_create_user", return_value=admin):
+            with patch(
+                "app.api.routes.admin.org_service.get_user_by_id", return_value=admin
+            ):
+                response = await client.delete(
+                    f"/api/admin/users/{admin.id}",
+                    headers={"Authorization": "Bearer fake"},
+                )
+
+    assert response.status_code == 400

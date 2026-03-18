@@ -3,10 +3,26 @@
 from unittest.mock import AsyncMock, MagicMock
 import uuid
 
-from app.services.user_service import get_or_create_user
+from app.services.user_service import delete_user_completely, get_or_create_user
 from app.core.roles import SystemRole
 from app.models.org_membership import OrgMembership
 from app.models.user import User
+
+# ── Deletion ──
+
+
+async def test_delete_user_completely_removes_memberships_and_user():
+    user = MagicMock(spec=User)
+    user.id = uuid.uuid4()
+
+    mock_db = AsyncMock()
+
+    await delete_user_completely(mock_db, user)
+
+    mock_db.execute.assert_awaited_once()
+    mock_db.delete.assert_awaited_once_with(user)
+    mock_db.flush.assert_awaited_once()
+
 
 # ── Existing user lookup ──
 
