@@ -44,11 +44,13 @@ def _mock_db_existing_user(email="admin@company.com", has_membership=True):
     user_result.scalar_one_or_none.return_value = existing
 
     membership_result = MagicMock()
+    scalars_mock = MagicMock()
+    membership_result.scalars.return_value = scalars_mock
     if has_membership:
         mock_mem = MagicMock(spec=OrgMembership)
-        membership_result.scalar_one_or_none.return_value = mock_mem
+        scalars_mock.first.return_value = mock_mem
     else:
-        membership_result.scalar_one_or_none.return_value = None
+        scalars_mock.first.return_value = None
 
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
@@ -178,7 +180,9 @@ async def test_promotes_existing_user_to_admin(mock_settings):
     user_result.scalar_one_or_none.return_value = existing
 
     membership_result = MagicMock()
-    membership_result.scalar_one_or_none.return_value = None
+    scalars_mock = MagicMock()
+    membership_result.scalars.return_value = scalars_mock
+    scalars_mock.first.return_value = None
 
     mock_db = AsyncMock()
     mock_db.add = MagicMock()

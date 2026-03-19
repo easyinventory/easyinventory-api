@@ -88,7 +88,7 @@ async def run_bootstrap(db: AsyncSession) -> None:
     # ── User exists — check for org membership ──
     mem_stmt = select(OrgMembership).where(OrgMembership.user_id == existing_user.id)
     mem_result = await db.execute(mem_stmt)
-    existing_membership = mem_result.scalar_one_or_none()
+    existing_membership = mem_result.scalars().first()
 
     if existing_membership is not None:
         print(f"[bootstrap] Admin user '{email}' already exists")
