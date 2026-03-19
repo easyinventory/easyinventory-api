@@ -185,14 +185,14 @@ async def test_admin_can_delete_user_system_and_cognito(client):
     ):
         with patch("app.auth.deps.get_or_create_user", return_value=admin):
             with patch(
-                "app.api.routes.admin.org_service.get_user_by_id", return_value=target
+                "app.users.service.get_user_by_id", return_value=target
             ):
                 with patch(
-                    "app.api.routes.admin.delete_user_completely",
+                    "app.admin.routes_users.user_service.delete_user_completely",
                     new_callable=AsyncMock,
                 ) as mock_delete_db:
                     with patch(
-                        "app.api.routes.admin.delete_cognito_user"
+                        "app.admin.routes_users.delete_cognito_user"
                     ) as mock_delete_cognito:
                         response = await client.delete(
                             f"/api/admin/users/{target.id}",
@@ -214,7 +214,7 @@ async def test_admin_delete_user_returns_404_for_missing_user(client):
     ):
         with patch("app.auth.deps.get_or_create_user", return_value=admin):
             with patch(
-                "app.api.routes.admin.org_service.get_user_by_id", return_value=None
+                "app.users.service.get_user_by_id", return_value=None
             ):
                 response = await client.delete(
                     f"/api/admin/users/{missing_id}",
@@ -233,7 +233,7 @@ async def test_admin_cannot_delete_own_account(client):
     ):
         with patch("app.auth.deps.get_or_create_user", return_value=admin):
             with patch(
-                "app.api.routes.admin.org_service.get_user_by_id", return_value=admin
+                "app.users.service.get_user_by_id", return_value=admin
             ):
                 response = await client.delete(
                     f"/api/admin/users/{admin.id}",
