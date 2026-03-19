@@ -1,14 +1,16 @@
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
-from app.services.org_service import (
+from app.orgs.service import (
     create_membership,
-    create_placeholder_user,
     update_role,
     set_active_status,
     delete_membership,
-    find_user_by_email,
     find_existing_membership,
+)
+from app.users.service import (
+    create_placeholder_user,
+    find_user_by_email,
 )
 from app.models.user import User
 from app.models.org_membership import OrgMembership

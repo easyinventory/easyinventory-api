@@ -1,3 +1,7 @@
+"""
+Admin schemas — request/response models for system-admin endpoints.
+"""
+
 from __future__ import annotations
 
 import uuid

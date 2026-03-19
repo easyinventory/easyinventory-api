@@ -1,25 +1,28 @@
+"""
+Admin org routes — system-admin organization CRUD and member introspection.
+"""
+
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.cognito_admin import delete_cognito_user
+from app.admin import service as admin_service
+from app.admin.schemas import (
+    CreateOrgRequest,
+    OrgListItem,
+    TransferOwnershipRequest,
+    UpdateOrgRequest,
+)
 from app.auth.deps import require_role
 from app.core.database import get_db
 from app.core.roles import OrgRole, SystemRole
 from app.models.organization import Organization
 from app.models.user import User
-from app.schemas.admin import (
-    CreateOrgRequest,
-    OrgListItem,
-    TransferOwnershipRequest,
-    UpdateOrgRequest,
-    UserListItem,
-)
-from app.schemas.org import OrgMemberDetail
-from app.services import org_service
+from app.orgs import service as org_service
+from app.orgs.schemas import OrgMemberDetail
 from app.services.invite_service import invite_user_to_org
-from app.services.user_service import delete_user_completely
+from app.users import service as user_service
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -31,7 +34,7 @@ async def _get_org_or_404(
     db: AsyncSession,
     org_id: uuid.UUID,
 ) -> Organization:
-    org = await org_service.get_org_by_id(db, org_id)
+    org = await admin_service.get_org_by_id(db, org_id)
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
     return org
@@ -99,7 +102,7 @@ async def list_orgs(
     db: AsyncSession = Depends(get_db),
 ) -> list[dict]:
     """List all organizations. System admin only."""
-    return await org_service.list_all_orgs(db)
+    return await admin_service.list_all_orgs(db)
 
 
 @router.patch("/orgs/{org_id}", response_model=OrgListItem)
@@ -111,10 +114,10 @@ async def rename_org(
 ) -> dict:
     """Rename an organization. System admin only."""
     org = await _get_org_or_404(db, org_id)
-    org = await org_service.rename_org(db, org, body.name)
+    org = await admin_service.rename_org(db, org, body.name)
 
     # Re-fetch owner info for the response
-    all_orgs = await org_service.list_all_orgs(db)
+    all_orgs = await admin_service.list_all_orgs(db)
     matched = next((o for o in all_orgs if o["id"] == org.id), None)
     return matched or {
         "id": org.id,
@@ -133,7 +136,7 @@ async def delete_org(
 ) -> None:
     """Delete an organization and all its memberships. System admin only."""
     org = await _get_org_or_404(db, org_id)
-    await org_service.delete_org(db, org)
+    await admin_service.delete_org(db, org)
 
 
 @router.post("/orgs/{org_id}/transfer-ownership", response_model=OrgMemberDetail)
@@ -146,13 +149,13 @@ async def transfer_ownership(
     """Transfer org ownership to another member. System admin only."""
     await _get_org_or_404(db, org_id)
 
-    new_owner_membership = await org_service.transfer_ownership(
+    new_owner_membership = await admin_service.transfer_ownership(
         db,
         org_id,
         body.new_owner_email,
     )
 
-    user = await org_service.get_user_by_id(db, new_owner_membership.user_id)
+    user = await user_service.get_user_by_id(db, new_owner_membership.user_id)
     return {
         "id": new_owner_membership.id,
         "user_id": new_owner_membership.user_id,
@@ -175,35 +178,3 @@ async def list_org_members(
     """List all members of a specific org. System admin only."""
     await _get_org_or_404(db, org_id)
     return await org_service.list_org_members(db=db, org_id=org_id)
-
-
-# ── User management ──
-
-
-@router.get("/users", response_model=list[UserListItem])
-async def list_users(
-    current_user: User = Depends(require_role(SystemRole.ADMIN)),
-    db: AsyncSession = Depends(get_db),
-) -> list[dict]:
-    """List all users across all orgs. System admin only."""
-    return await org_service.list_all_users(db)
-
-
-@router.delete("/users/{user_id}", status_code=204)
-async def delete_user(
-    user_id: uuid.UUID,
-    current_user: User = Depends(require_role(SystemRole.ADMIN)),
-    db: AsyncSession = Depends(get_db),
-) -> None:
-    """Delete a user from the local system and Cognito."""
-    target = await org_service.get_user_by_id(db, user_id)
-    if not target:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if target.id == current_user.id:
-        raise HTTPException(
-            status_code=400, detail="You cannot delete your own account"
-        )
-
-    await delete_user_completely(db, target)
-    delete_cognito_user(target.email, target.cognito_sub)

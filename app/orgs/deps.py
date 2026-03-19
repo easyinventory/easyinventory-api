@@ -1,12 +1,3 @@
-"""
-API dependencies — auth deps re-exported from auth.deps for backward compat.
-
-Auth deps (get_current_user, require_role, bearer_scheme) have moved to
-app.auth.deps. This module re-exports them so existing callers still work.
-Org deps (get_current_org_membership, require_org_role) remain here
-until they are migrated to app.orgs.deps in a later PR.
-"""
-
 from __future__ import annotations
 
 import uuid
@@ -14,13 +5,10 @@ from collections.abc import Callable
 from typing import Any
 
 from fastapi import Depends, Header, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.deps import (  # noqa: F401
-    bearer_scheme,
-    get_current_user,
-    require_role,
-)
+from app.auth.deps import get_current_user
 from app.core.database import get_db
 from app.models.org_membership import OrgMembership
 from app.models.user import User
@@ -41,8 +29,6 @@ async def get_current_org_membership(
     Raises 403 if user has no active org membership (or the requested
     org is not accessible to them).
     """
-    from sqlalchemy import select
-
     if x_org_id is not None:
         try:
             org_uuid = uuid.UUID(x_org_id)

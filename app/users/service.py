@@ -1,21 +1,57 @@
+"""
+User service — user lookup and lifecycle operations.
+
+Merges former user_service.py functions with user-centric functions
+previously housed in org_service.py.
+"""
+
 from __future__ import annotations
+
+import uuid
+from typing import Optional
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.roles import SystemRole
-from app.models.user import User
 from app.models.org_membership import OrgMembership
+from app.models.user import User
 
 
-async def delete_user_completely(
+async def get_user_by_id(
     db: AsyncSession,
-    user: User,
-) -> None:
-    """Delete a user and all their org memberships from the local DB."""
-    await db.execute(delete(OrgMembership).where(OrgMembership.user_id == user.id))
-    await db.delete(user)
+    user_id: uuid.UUID,
+) -> Optional[User]:
+    """Fetch a user by ID."""
+    stmt = select(User).where(User.id == user_id)
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def find_user_by_email(
+    db: AsyncSession,
+    email: str,
+) -> Optional[User]:
+    """Find a user by email. Returns None if not found."""
+    stmt = select(User).where(User.email == email)
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def create_placeholder_user(
+    db: AsyncSession,
+    email: str,
+) -> User:
+    """Create a placeholder for an invited email that hasn't signed up."""
+    user = User(
+        cognito_sub=f"pending:{email}",
+        email=email,
+        system_role=SystemRole.USER,
+        is_active=False,
+    )
+    db.add(user)
     await db.flush()
+    return user
 
 
 async def get_or_create_user(
@@ -77,3 +113,13 @@ async def get_or_create_user(
     await db.flush()
 
     return user
+
+
+async def delete_user_completely(
+    db: AsyncSession,
+    user: User,
+) -> None:
+    """Delete a user and all their org memberships from the local DB."""
+    await db.execute(delete(OrgMembership).where(OrgMembership.user_id == user.id))
+    await db.delete(user)
+    await db.flush()

@@ -2,7 +2,7 @@ import uuid
 from contextlib import contextmanager
 from unittest.mock import patch, MagicMock, AsyncMock
 
-from app.api.deps import get_current_org_membership
+from app.orgs.deps import get_current_org_membership
 from app.core.database import get_db
 from app.models.user import User
 from app.models.org_membership import OrgMembership

@@ -83,18 +83,18 @@ async def test_admin_can_create_org_with_new_email(app, client):
         ):
             with patch("app.auth.deps.get_or_create_user", return_value=admin):
                 with patch(
-                    "app.services.invite_service.org_service.find_user_by_email",
+                    "app.services.invite_service.user_service.find_user_by_email",
                     return_value=None,
                 ):
                     with patch(
                         "app.services.invite_service.invite_cognito_user"
                     ) as mock_cognito:
                         with patch(
-                            "app.services.org_service.create_placeholder_user",
+                            "app.users.service.create_placeholder_user",
                             return_value=mock_placeholder,
                         ):
                             with patch(
-                                "app.services.org_service.create_membership",
+                                "app.orgs.service.create_membership",
                                 return_value=mock_membership,
                             ):
                                 response = await client.post(
@@ -126,17 +126,17 @@ async def test_admin_can_create_org_with_existing_user(app, client):
         ):
             with patch("app.auth.deps.get_or_create_user", return_value=admin):
                 with patch(
-                    "app.services.org_service.find_user_by_email",
+                    "app.users.service.find_user_by_email",
                     return_value=existing_user,
                 ):
                     with patch(
-                        "app.services.org_service.find_existing_membership",
+                        "app.orgs.service.find_existing_membership",
                         return_value=None,
                     ):
                         with patch(
                             "app.services.invite_service.invite_cognito_user"
                         ) as mock_cognito:
-                            with patch("app.services.org_service.create_membership"):
+                            with patch("app.orgs.service.create_membership"):
                                 response = await client.post(
                                     "/api/admin/orgs",
                                     json={
@@ -184,15 +184,13 @@ async def test_admin_can_delete_user_system_and_cognito(client):
         return_value={"sub": "abc", "email": admin.email},
     ):
         with patch("app.auth.deps.get_or_create_user", return_value=admin):
-            with patch(
-                "app.api.routes.admin.org_service.get_user_by_id", return_value=target
-            ):
+            with patch("app.users.service.get_user_by_id", return_value=target):
                 with patch(
-                    "app.api.routes.admin.delete_user_completely",
+                    "app.admin.routes_users.user_service.delete_user_completely",
                     new_callable=AsyncMock,
                 ) as mock_delete_db:
                     with patch(
-                        "app.api.routes.admin.delete_cognito_user"
+                        "app.admin.routes_users.delete_cognito_user"
                     ) as mock_delete_cognito:
                         response = await client.delete(
                             f"/api/admin/users/{target.id}",
@@ -213,9 +211,7 @@ async def test_admin_delete_user_returns_404_for_missing_user(client):
         return_value={"sub": "abc", "email": admin.email},
     ):
         with patch("app.auth.deps.get_or_create_user", return_value=admin):
-            with patch(
-                "app.api.routes.admin.org_service.get_user_by_id", return_value=None
-            ):
+            with patch("app.users.service.get_user_by_id", return_value=None):
                 response = await client.delete(
                     f"/api/admin/users/{missing_id}",
                     headers={"Authorization": "Bearer fake"},
@@ -232,9 +228,7 @@ async def test_admin_cannot_delete_own_account(client):
         return_value={"sub": "abc", "email": admin.email},
     ):
         with patch("app.auth.deps.get_or_create_user", return_value=admin):
-            with patch(
-                "app.api.routes.admin.org_service.get_user_by_id", return_value=admin
-            ):
+            with patch("app.users.service.get_user_by_id", return_value=admin):
                 response = await client.delete(
                     f"/api/admin/users/{admin.id}",
                     headers={"Authorization": "Bearer fake"},

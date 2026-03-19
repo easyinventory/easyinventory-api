@@ -1,9 +1,9 @@
-"""Tests for app.api.permissions — shared org permission helpers."""
+"""Tests for app.orgs.permissions — shared org permission helpers."""
 
 import pytest
 from unittest.mock import MagicMock
 
-from app.api.permissions import (
+from app.orgs.permissions import (
     assert_admin_hierarchy,
     assert_can_assign_role,
     assert_not_owner,

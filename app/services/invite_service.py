@@ -15,7 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.cognito_admin import invite_cognito_user
 from app.core.exceptions import AlreadyExists
 from app.models.org_membership import OrgMembership
-from app.services import org_service
+from app.orgs import service as org_service
+from app.users import service as user_service
 
 
 async def invite_user_to_org(
@@ -48,7 +49,7 @@ async def invite_user_to_org(
     Raises:
         AlreadyExists: If the user is already a member (active or pending)
     """
-    existing_user = await org_service.find_user_by_email(db, email)
+    existing_user = await user_service.find_user_by_email(db, email)
 
     if existing_user:
         if not is_new_org:
@@ -75,7 +76,7 @@ async def invite_user_to_org(
 
     # Unknown email → Cognito invite + placeholder + inactive membership
     invite_cognito_user(email)
-    placeholder = await org_service.create_placeholder_user(db, email)
+    placeholder = await user_service.create_placeholder_user(db, email)
     return await org_service.create_membership(
         db=db,
         org_id=org_id,
