@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.cognito_token import get_email_from_access_token, verify_token
 from app.core.database import get_db
 from app.models.user import User
-from app.services.user_service import get_or_create_user
+from app.users.service import get_or_create_user
 
 bearer_scheme = HTTPBearer(auto_error=False)
 

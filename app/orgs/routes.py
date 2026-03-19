@@ -28,7 +28,8 @@ from app.orgs.schemas import (
     InviteMemberRequest,
     UpdateRoleRequest,
 )
-from app.services import org_service
+from app.orgs import service as org_service
+from app.users import service as user_service
 from app.services.invite_service import invite_user_to_org
 
 router = APIRouter(prefix="/api/orgs", tags=["organizations"])
@@ -57,7 +58,7 @@ async def _member_detail(
     email: str | None = None,
 ) -> dict:
     if not email:
-        user = await org_service.get_user_by_id(db, membership.user_id)
+        user = await user_service.get_user_by_id(db, membership.user_id)
         email = user.email if user else ""
     return {
         "id": membership.id,

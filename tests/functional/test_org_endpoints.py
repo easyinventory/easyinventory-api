@@ -83,10 +83,10 @@ async def test_duplicate_active_member_returns_400(app, client):
 
     with _org_dependency_overrides(app, membership):
         with patch(
-            "app.services.org_service.find_user_by_email", return_value=existing_user
+            "app.users.service.find_user_by_email", return_value=existing_user
         ):
             with patch(
-                "app.services.org_service.find_existing_membership",
+                "app.orgs.service.find_existing_membership",
                 return_value=existing_membership,
             ):
                 response = await client.post(
@@ -105,10 +105,10 @@ async def test_duplicate_pending_invite_returns_400(app, client):
 
     with _org_dependency_overrides(app, membership):
         with patch(
-            "app.services.org_service.find_user_by_email", return_value=placeholder_user
+            "app.users.service.find_user_by_email", return_value=placeholder_user
         ):
             with patch(
-                "app.services.org_service.find_existing_membership",
+                "app.orgs.service.find_existing_membership",
                 return_value=pending_membership,
             ):
                 response = await client.post(
@@ -125,18 +125,18 @@ async def test_invite_unknown_email_calls_cognito(app, client):
     membership = _mock_membership(role="ORG_OWNER")
 
     with _org_dependency_overrides(app, membership):
-        with patch("app.services.org_service.find_user_by_email", return_value=None):
+        with patch("app.users.service.find_user_by_email", return_value=None):
             with patch(
                 "app.services.invite_service.invite_cognito_user"
             ) as mock_cognito:
                 with patch(
-                    "app.services.org_service.create_placeholder_user"
+                    "app.users.service.create_placeholder_user"
                 ) as mock_placeholder:
                     placeholder_user = MagicMock(id=uuid.uuid4())
                     mock_placeholder.return_value = placeholder_user
 
                     with patch(
-                        "app.services.org_service.create_membership"
+                        "app.orgs.service.create_membership"
                     ) as mock_membership_create:
                         mock_membership_create.return_value = MagicMock(
                             id=uuid.uuid4(),
@@ -163,16 +163,16 @@ async def test_invite_existing_email_does_not_call_cognito(app, client):
 
     with _org_dependency_overrides(app, membership):
         with patch(
-            "app.services.org_service.find_user_by_email", return_value=existing_user
+            "app.users.service.find_user_by_email", return_value=existing_user
         ):
             with patch(
-                "app.services.org_service.find_existing_membership", return_value=None
+                "app.orgs.service.find_existing_membership", return_value=None
             ):
                 with patch(
                     "app.services.invite_service.invite_cognito_user"
                 ) as mock_cognito:
                     with patch(
-                        "app.services.org_service.create_membership"
+                        "app.orgs.service.create_membership"
                     ) as mock_create:
                         mock_create.return_value = MagicMock(
                             id=uuid.uuid4(),
@@ -204,7 +204,7 @@ async def test_cannot_deactivate_owner(app, client):
 
     with _org_dependency_overrides(app, actor):
         with patch(
-            "app.services.org_service.get_membership_by_id", return_value=target
+            "app.orgs.service.get_membership_by_id", return_value=target
         ):
             response = await client.patch(
                 f"/api/orgs/members/{target.id}/deactivate",
@@ -220,7 +220,7 @@ async def test_cannot_remove_owner(app, client):
 
     with _org_dependency_overrides(app, actor):
         with patch(
-            "app.services.org_service.get_membership_by_id", return_value=target
+            "app.orgs.service.get_membership_by_id", return_value=target
         ):
             response = await client.delete(
                 f"/api/orgs/members/{target.id}",
@@ -235,7 +235,7 @@ async def test_cannot_change_owner_role(app, client):
 
     with _org_dependency_overrides(app, actor):
         with patch(
-            "app.services.org_service.get_membership_by_id", return_value=target
+            "app.orgs.service.get_membership_by_id", return_value=target
         ):
             response = await client.patch(
                 f"/api/orgs/members/{target.id}/role",
@@ -254,7 +254,7 @@ async def test_admin_cannot_deactivate_admin(app, client):
 
     with _org_dependency_overrides(app, actor):
         with patch(
-            "app.services.org_service.get_membership_by_id", return_value=target
+            "app.orgs.service.get_membership_by_id", return_value=target
         ):
             response = await client.patch(
                 f"/api/orgs/members/{target.id}/deactivate",
@@ -269,7 +269,7 @@ async def test_admin_cannot_remove_admin(app, client):
 
     with _org_dependency_overrides(app, actor):
         with patch(
-            "app.services.org_service.get_membership_by_id", return_value=target
+            "app.orgs.service.get_membership_by_id", return_value=target
         ):
             response = await client.delete(
                 f"/api/orgs/members/{target.id}",

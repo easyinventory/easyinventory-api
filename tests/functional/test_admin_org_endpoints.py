@@ -83,18 +83,18 @@ async def test_admin_can_create_org_with_new_email(app, client):
         ):
             with patch("app.auth.deps.get_or_create_user", return_value=admin):
                 with patch(
-                    "app.services.invite_service.org_service.find_user_by_email",
+                    "app.services.invite_service.user_service.find_user_by_email",
                     return_value=None,
                 ):
                     with patch(
                         "app.services.invite_service.invite_cognito_user"
                     ) as mock_cognito:
                         with patch(
-                            "app.services.org_service.create_placeholder_user",
+                            "app.users.service.create_placeholder_user",
                             return_value=mock_placeholder,
                         ):
                             with patch(
-                                "app.services.org_service.create_membership",
+                                "app.orgs.service.create_membership",
                                 return_value=mock_membership,
                             ):
                                 response = await client.post(
@@ -126,17 +126,17 @@ async def test_admin_can_create_org_with_existing_user(app, client):
         ):
             with patch("app.auth.deps.get_or_create_user", return_value=admin):
                 with patch(
-                    "app.services.org_service.find_user_by_email",
+                    "app.users.service.find_user_by_email",
                     return_value=existing_user,
                 ):
                     with patch(
-                        "app.services.org_service.find_existing_membership",
+                        "app.orgs.service.find_existing_membership",
                         return_value=None,
                     ):
                         with patch(
                             "app.services.invite_service.invite_cognito_user"
                         ) as mock_cognito:
-                            with patch("app.services.org_service.create_membership"):
+                            with patch("app.orgs.service.create_membership"):
                                 response = await client.post(
                                     "/api/admin/orgs",
                                     json={
