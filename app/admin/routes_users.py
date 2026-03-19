@@ -23,9 +23,20 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 async def list_users(
     current_user: User = Depends(require_role(SystemRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
-) -> list[dict]:
+) -> list[UserListItem]:
     """List all users across all orgs. System admin only."""
-    return await admin_service.list_all_users(db)
+    users = await admin_service.list_all_users(db)
+    return [
+        UserListItem(
+            id=user.id,
+            email=user.email,
+            system_role=user.system_role,
+            is_active=user.is_active,
+            created_at=user.created_at,
+            org_count=len([m for m in user.memberships if m.is_active]),
+        )
+        for user in users
+    ]
 
 
 @router.delete("/users/{user_id}", status_code=204)

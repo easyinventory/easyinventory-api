@@ -137,6 +137,7 @@ async def test_invite_unknown_email_calls_cognito(app, client):
                         mock_membership_create.return_value = MagicMock(
                             id=uuid.uuid4(),
                             user_id=placeholder_user.id,
+                            email="new@test.com",
                             org_role="ORG_EMPLOYEE",
                             is_active=False,
                             joined_at="2026-03-13T00:00:00+00:00",
@@ -165,6 +166,7 @@ async def test_invite_existing_email_does_not_call_cognito(app, client):
                         mock_create.return_value = MagicMock(
                             id=uuid.uuid4(),
                             user_id=existing_user.id,
+                            email="exists@test.com",
                             org_role="ORG_EMPLOYEE",
                             is_active=True,
                             joined_at="2026-03-13T00:00:00+00:00",

@@ -11,32 +11,20 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.org_membership import OrgMembership
-from app.models.user import User
 
 
 async def list_org_members(
     db: AsyncSession,
     org_id: uuid.UUID,
-) -> list[dict]:
-    """List all members of an org with their user email."""
+) -> list[OrgMembership]:
+    """List all members of an org (with user relationship loaded)."""
     stmt = (
-        select(OrgMembership, User.email)
-        .join(User, OrgMembership.user_id == User.id)
+        select(OrgMembership)
         .where(OrgMembership.org_id == org_id)
         .order_by(OrgMembership.joined_at)
     )
     result = await db.execute(stmt)
-    return [
-        {
-            "id": m.id,
-            "user_id": m.user_id,
-            "email": email,
-            "org_role": m.org_role,
-            "is_active": m.is_active,
-            "joined_at": m.joined_at,
-        }
-        for m, email in result.all()
-    ]
+    return list(result.scalars().all())
 
 
 async def get_membership_by_id(
@@ -85,6 +73,7 @@ async def create_membership(
     )
     db.add(membership)
     await db.flush()
+    await db.refresh(membership, ["user"])
     return membership
 
 
