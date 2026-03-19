@@ -23,8 +23,17 @@ test-db:
 	  -e POSTGRES_DB=easyinventory_test \
 	  -p 5433:5432 \
 	  postgres:16-alpine
-	@echo "Waiting for Postgres…"
-	@sleep 2
+	@echo "Waiting for Postgres to become ready..."
+	@max_retries=30; \
+	  until docker exec easyinventory-test-db pg_isready -U test -d easyinventory_test -q >/dev/null 2>&1; do \
+	    if [ $$max_retries -le 0 ]; then \
+	      echo "Postgres did not become ready in time. Please check the container logs (docker logs easyinventory-test-db)." >&2; \
+	      exit 1; \
+	    fi; \
+	    max_retries=$$((max_retries - 1)); \
+	    echo "Postgres is not ready yet; retrying..."; \
+	    sleep 1; \
+	  done
 
 
 test-db-stop:
