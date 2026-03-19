@@ -42,16 +42,19 @@ GET http://localhost:8000/health
 
 ## Development Commands
 
-| Command              | What it does                            |
-|----------------------|-----------------------------------------|
-| `make run`           | Start the app with Docker               |
-| `make build`         | Rebuild and start                       |
-| `make test`          | Run all tests                           |
-| `make test-unit`     | Run unit tests only                     |
-| `make test-functional` | Run functional tests only             |
-| `make lint`          | Check formatting (black) + types (mypy) |
-| `make format-fix`    | Auto-fix formatting with black          |
-| `make typecheck`     | Run mypy type checks                    |
+| Command              | What it does                              |
+|----------------------|-------------------------------------------|
+| `make run`           | Start the app with Docker                 |
+| `make build`         | Rebuild and start                         |
+| `make test`          | Run existing test suite (mocked DB)       |
+| `make test-unit`     | Run unit tests only                       |
+| `make test-functional` | Run functional tests only               |
+| `make test-db`       | Start a local test Postgres on port 5433  |
+| `make test-db-stop`  | Stop the local test Postgres              |
+| `make test-v2`       | Run testsv2 suite (real DB, requires test-db) |
+| `make lint`          | Check formatting (black) + types (mypy)   |
+| `make format-fix`    | Auto-fix formatting with black            |
+| `make typecheck`     | Run mypy type checks                      |
 
 ## Database
 
@@ -197,6 +200,37 @@ docker compose exec db psql -U postgres -d easyinventory
 Running Alembic locally will fail because `db` (the Postgres hostname)
 only resolves inside the Docker network.
 
+## Testing
+
+### Existing suite (`tests/`)
+
+Uses mocked database sessions. No real Postgres needed:
+
+```bash
+make test           # all tests
+make test-unit      # unit only
+make test-functional # functional only
+```
+
+### Real-database suite (`testsv2/`)
+
+Runs against a real Postgres instance with transaction-per-test rollback:
+
+```bash
+# 1. Start a disposable test database (port 5433)
+make test-db
+
+# 2. Run migrations + tests
+make test-v2
+
+# 3. Stop the test database when done
+make test-db-stop
+```
+
+The `testsv2/` factories (`create_user`, `create_org`, etc.) insert real
+rows via the test session. Each test's data is automatically rolled back,
+so tests are fully isolated and can run in any order.
+
 ## Local Dev Without Docker
 
 Use this if you want to run the API directly on your machine.
@@ -249,28 +283,68 @@ curl http://localhost:8000/health
 
 ```
 app/
-├── main.py              # App factory, CORS, lifespan DB check
-├── core/
-│   ├── config.py        # Environment-based settings (pydantic)
-│   └── database.py      # SQLAlchemy engine, session, get_db dependency
-├── api/routes/          # Route handlers (one file per feature)
-├── models/
-│   ├── base.py              # Abstract base model (UUID pk + created_at)
-│   ├── user.py              # User model (cognito_sub, system_role)
-│   ├── organization.py      # Organization model
-│   ├── org_membership.py    # Org membership with role + FKs
-│   ├── supplier.py          # Supplier model (org-scoped)
-│   ├── product.py           # Product model (org-scoped)
-│   └── product_supplier.py  # Product ↔ Supplier join table (is_active)
-├── schemas/             # Pydantic request/response schemas
-└── services/            # Business logic layer
+├── main.py                  # App factory, CORS, lifespan DB check
+├── core/                    # Shared infrastructure
+│   ├── config.py            #   Environment-based settings (pydantic)
+│   ├── database.py          #   SQLAlchemy engine, session, get_db
+│   ├── exceptions.py        #   Domain exception hierarchy (AppError)
+│   ├── middleware.py        #   JSON logging, request logging middleware
+│   └── roles.py             #   SystemRole / OrgRole constants
+├── auth/                    # Authentication domain
+│   ├── cognito_token.py     #   JWKS fetch, JWT verification (hot path)
+│   ├── cognito_admin.py     #   Cognito admin ops: invite, delete (cold path)
+│   ├── deps.py              #   get_current_user, require_role dependencies
+│   ├── routes.py            #   GET /api/me
+│   └── schemas.py           #   UserResponse
+├── orgs/                    # Organization management domain
+│   ├── deps.py              #   get_current_org_membership, require_org_role
+│   ├── permissions.py       #   Permission assertion helpers
+│   ├── routes.py            #   Organization member endpoints
+│   ├── schemas.py           #   Org Pydantic schemas
+│   └── service.py           #   Member CRUD (pure DB operations)
+├── admin/                   # System admin domain
+│   ├── routes_orgs.py       #   Admin org CRUD + status + introspection
+│   ├── routes_users.py      #   Admin user listing + deletion
+│   ├── schemas.py           #   Admin-specific schemas
+│   └── service.py           #   System-admin operations
+├── users/                   # User lifecycle domain
+│   └── service.py           #   get_or_create_user, delete_user, etc.
+├── invites/                 # Invite orchestration domain
+│   └── service.py           #   invite_user_to_org (Cognito + DB)
+├── products/                # Products domain
+│   ├── routes.py            #   Product CRUD + supplier link endpoints
+│   ├── schemas.py           #   Product Pydantic schemas
+│   └── service.py           #   Product data access
+├── suppliers/               # Suppliers domain
+│   ├── routes.py            #   Supplier CRUD endpoints
+│   ├── schemas.py           #   Supplier Pydantic schemas
+│   └── service.py           #   Supplier data access
+├── bootstrap/               # Startup seeding
+│   ├── seeder.py            #   run_bootstrap (admin + sample data)
+│   └── seed_data.py         #   SEED_SUPPLIERS, SEED_PRODUCTS dicts
+├── health/                  # Health check
+│   └── routes.py            #   GET /health
+└── models/                  # SQLAlchemy ORM models
+    ├── base.py              #   Abstract base (UUID pk + created_at)
+    ├── user.py              #   User (cognito_sub, system_role)
+    ├── organization.py      #   Organization
+    ├── org_membership.py    #   OrgMembership (role + FKs)
+    ├── supplier.py          #   Supplier (org-scoped)
+    ├── product.py           #   Product (org-scoped)
+    └── product_supplier.py  #   Product ↔ Supplier join (is_active)
 alembic/
-├── env.py               # Async migration runner
-└── versions/            # Migration files (auto-generated)
-tests/
-├── conftest.py          # Shared fixtures (app, async client)
-├── unit/                # Pure logic tests (no HTTP, no DB)
-└── functional/          # HTTP endpoint tests via test client
+├── env.py                   # Async migration runner
+└── versions/                # Migration files (auto-generated)
+tests/                       # Existing test suite (mocked DB)
+├── conftest.py              #   Shared fixtures (app, async client)
+├── unit/                    #   Pure logic tests (no HTTP, no DB)
+└── functional/              #   HTTP endpoint tests via test client
+testsv2/                     # Real-database test suite (new)
+├── conftest.py              #   DB engine, transaction-per-test rollback
+├── factories.py             #   Factory functions that INSERT real rows
+├── integration/             #   Service-layer tests against real Postgres
+└── functional/              #   HTTP endpoint tests against real Postgres
+    └── conftest.py          #   Auth bypass fixture
 ```
 
 ## Environment Variables
