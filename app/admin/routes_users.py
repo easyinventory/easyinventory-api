@@ -45,4 +45,5 @@ async def delete_user(
         )
 
     await user_service.delete_user_completely(db, target)
+    await db.commit()
     delete_cognito_user(target.email, target.cognito_sub)
