@@ -9,18 +9,20 @@ Fixtures
 - ``client``      – httpx AsyncClient pointing at the ``app``.
 
 The test database URL is read from the ``DATABASE_URL`` environment variable
-(set by the Makefile ``test-v2`` target or CI).  Tables are created once per
-session via ``Base.metadata.create_all`` as a safety net on top of Alembic
-migrations.
+(set by the Makefile ``test-v2`` target or CI).  Tables are expected to exist
+already (created by ``alembic upgrade head`` before running tests).
+
+A session-scoped ``Base.metadata.create_all`` call is used as a safety net on
+top of Alembic migrations.
 """
 
 from collections.abc import AsyncGenerator
 
 import pytest
+import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
-    async_sessionmaker,
     create_async_engine,
 )
 
@@ -31,19 +33,19 @@ from app.main import create_app
 # ── Import all models so Base.metadata knows every table ──
 import app.models  # noqa: F401
 
-# ── Engine scoped to the entire test session ──
+# ── Engine shared across the entire test session ──
 test_engine = create_async_engine(settings.DATABASE_URL, echo=False)
-TestSessionLocal = async_sessionmaker(
-    test_engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
 
 
 # ── Create / drop tables once per session ──
-@pytest.fixture(scope="session", autouse=True)
+@pytest_asyncio.fixture(scope="session", autouse=True)
 async def setup_database():
-    """Create all tables at the start, drop them at the end."""
+    """
+    Safety-net: create all tables at session start, drop at end.
+
+    Tables normally exist from ``alembic upgrade head``, but this ensures
+    they're present even if migrations haven't been run.
+    """
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
