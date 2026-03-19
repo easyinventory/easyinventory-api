@@ -72,9 +72,7 @@ async def test_create_supplier_returns_201(app, client):
     new_supplier = _mock_supplier(org_id=membership.org_id)
 
     with _supplier_dependency_overrides(app, membership):
-        with patch(
-            "app.suppliers.service.create_supplier", return_value=new_supplier
-        ):
+        with patch("app.suppliers.service.create_supplier", return_value=new_supplier):
             response = await client.post(
                 "/api/suppliers",
                 json={"name": "Test Supplier"},
