@@ -46,4 +46,4 @@ class OrgMembership(BaseModel):
     @property
     def email(self) -> str:
         """Expose user email for Pydantic serialization."""
-        return self.user.email if self.user else ""
+        return self.user.email
