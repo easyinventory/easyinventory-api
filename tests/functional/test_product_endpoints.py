@@ -80,7 +80,7 @@ async def test_list_products_returns_200(app, client):
     membership = _mock_membership()
 
     with _product_dependency_overrides(app, membership):
-        with patch("app.services.product_service.list_products", return_value=[]):
+        with patch("app.products.service.list_products", return_value=[]):
             response = await client.get(
                 "/api/products",
                 headers={"Authorization": "Bearer fake"},
@@ -94,7 +94,7 @@ async def test_get_product_returns_200(app, client):
     product = _mock_product(org_id=membership.org_id)
 
     with _product_dependency_overrides(app, membership):
-        with patch("app.services.product_service.get_product", return_value=product):
+        with patch("app.products.service.get_product", return_value=product):
             response = await client.get(
                 f"/api/products/{product.id}",
                 headers={"Authorization": "Bearer fake"},
@@ -109,7 +109,7 @@ async def test_get_nonexistent_product_returns_404(app, client):
     membership = _mock_membership()
 
     with _product_dependency_overrides(app, membership):
-        with patch("app.services.product_service.get_product", return_value=None):
+        with patch("app.products.service.get_product", return_value=None):
             response = await client.get(
                 f"/api/products/{uuid.uuid4()}",
                 headers={"Authorization": "Bearer fake"},
@@ -123,7 +123,7 @@ async def test_create_product_returns_201(app, client):
 
     with _product_dependency_overrides(app, membership):
         with patch(
-            "app.services.product_service.create_product", return_value=new_product
+            "app.products.service.create_product", return_value=new_product
         ):
             response = await client.post(
                 "/api/products",
@@ -141,9 +141,9 @@ async def test_update_product_returns_200(app, client):
     updated.name = "Updated Product"
 
     with _product_dependency_overrides(app, membership):
-        with patch("app.services.product_service.get_product", return_value=product):
+        with patch("app.products.service.get_product", return_value=product):
             with patch(
-                "app.services.product_service.update_product", return_value=updated
+                "app.products.service.update_product", return_value=updated
             ):
                 response = await client.put(
                     f"/api/products/{product.id}",
@@ -171,8 +171,8 @@ async def test_delete_product_works_for_owner(app, client):
     product = _mock_product(org_id=membership.org_id)
 
     with _product_dependency_overrides(app, membership):
-        with patch("app.services.product_service.get_product", return_value=product):
-            with patch("app.services.product_service.delete_product"):
+        with patch("app.products.service.get_product", return_value=product):
+            with patch("app.products.service.delete_product"):
                 response = await client.delete(
                     f"/api/products/{product.id}",
                     headers={"Authorization": "Bearer fake"},
@@ -194,9 +194,9 @@ async def test_list_product_suppliers_returns_200(app, client):
     ps_link = _mock_product_supplier(product_id=product.id, supplier_id=uuid.uuid4())
 
     with _product_dependency_overrides(app, membership):
-        with patch("app.services.product_service.get_product", return_value=product):
+        with patch("app.products.service.get_product", return_value=product):
             with patch(
-                "app.services.product_service.list_product_suppliers",
+                "app.products.service.list_product_suppliers",
                 return_value=[ps_link],
             ):
                 response = await client.get(
@@ -216,17 +216,17 @@ async def test_add_supplier_to_product_returns_201(app, client):
     ps_link = _mock_product_supplier(product_id=product.id, supplier_id=supplier.id)
 
     with _product_dependency_overrides(app, membership):
-        with patch("app.services.product_service.get_product", return_value=product):
+        with patch("app.products.service.get_product", return_value=product):
             with patch(
-                "app.services.product_service.get_supplier_in_org",
+                "app.products.service.get_supplier_in_org",
                 return_value=supplier,
             ):
                 with patch(
-                    "app.services.product_service.get_product_supplier_link",
+                    "app.products.service.get_product_supplier_link",
                     return_value=None,
                 ):
                     with patch(
-                        "app.services.product_service.add_supplier_to_product",
+                        "app.products.service.add_supplier_to_product",
                         return_value=ps_link,
                     ):
                         response = await client.post(
@@ -247,13 +247,13 @@ async def test_add_supplier_to_product_409_duplicate(app, client):
     )
 
     with _product_dependency_overrides(app, membership):
-        with patch("app.services.product_service.get_product", return_value=product):
+        with patch("app.products.service.get_product", return_value=product):
             with patch(
-                "app.services.product_service.get_supplier_in_org",
+                "app.products.service.get_supplier_in_org",
                 return_value=supplier,
             ):
                 with patch(
-                    "app.services.product_service.get_product_supplier_link",
+                    "app.products.service.get_product_supplier_link",
                     return_value=existing_link,
                 ):
                     response = await client.post(
@@ -269,9 +269,9 @@ async def test_add_supplier_404_wrong_org(app, client):
     product = _mock_product(org_id=membership.org_id)
 
     with _product_dependency_overrides(app, membership):
-        with patch("app.services.product_service.get_product", return_value=product):
+        with patch("app.products.service.get_product", return_value=product):
             with patch(
-                "app.services.product_service.get_supplier_in_org",
+                "app.products.service.get_supplier_in_org",
                 return_value=None,
             ):
                 response = await client.post(
@@ -294,13 +294,13 @@ async def test_update_product_supplier_is_active(app, client):
     )
 
     with _product_dependency_overrides(app, membership):
-        with patch("app.services.product_service.get_product", return_value=product):
+        with patch("app.products.service.get_product", return_value=product):
             with patch(
-                "app.services.product_service.get_product_supplier_link",
+                "app.products.service.get_product_supplier_link",
                 return_value=ps_link,
             ):
                 with patch(
-                    "app.services.product_service.update_product_supplier_link",
+                    "app.products.service.update_product_supplier_link",
                     return_value=updated_link,
                 ):
                     response = await client.patch(
@@ -319,12 +319,12 @@ async def test_remove_supplier_from_product_returns_204(app, client):
     ps_link = _mock_product_supplier(product_id=product.id, supplier_id=supplier_id)
 
     with _product_dependency_overrides(app, membership):
-        with patch("app.services.product_service.get_product", return_value=product):
+        with patch("app.products.service.get_product", return_value=product):
             with patch(
-                "app.services.product_service.get_product_supplier_link",
+                "app.products.service.get_product_supplier_link",
                 return_value=ps_link,
             ):
-                with patch("app.services.product_service.remove_supplier_from_product"):
+                with patch("app.products.service.remove_supplier_from_product"):
                     response = await client.delete(
                         f"/api/products/{product.id}/suppliers/{supplier_id}",
                         headers={"Authorization": "Bearer fake"},
@@ -337,9 +337,9 @@ async def test_remove_nonexistent_supplier_link_returns_404(app, client):
     product = _mock_product(org_id=membership.org_id)
 
     with _product_dependency_overrides(app, membership):
-        with patch("app.services.product_service.get_product", return_value=product):
+        with patch("app.products.service.get_product", return_value=product):
             with patch(
-                "app.services.product_service.get_product_supplier_link",
+                "app.products.service.get_product_supplier_link",
                 return_value=None,
             ):
                 response = await client.delete(

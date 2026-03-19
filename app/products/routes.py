@@ -9,7 +9,7 @@ from app.orgs.deps import get_current_org_membership, require_org_role
 from app.core.database import get_db
 from app.models.org_membership import OrgMembership
 from app.models.product import Product
-from app.schemas.product import (
+from app.products.schemas import (
     ProductCreate,
     ProductUpdate,
     ProductResponse,
@@ -18,7 +18,7 @@ from app.schemas.product import (
     ProductSupplierUpdate,
     ProductSupplierResponse,
 )
-from app.services import product_service
+from app.products import service as product_service
 
 router = APIRouter(prefix="/api/products", tags=["products"])
 

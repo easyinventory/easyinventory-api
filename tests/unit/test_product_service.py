@@ -1,7 +1,7 @@
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
-from app.services.product_service import (
+from app.products.service import (
     create_product,
     update_product,
     delete_product,
