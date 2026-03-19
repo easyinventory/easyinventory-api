@@ -124,9 +124,7 @@ async def test_invite_unknown_email_calls_cognito(app, client):
 
     with _org_dependency_overrides(app, membership):
         with patch("app.users.service.find_user_by_email", return_value=None):
-            with patch(
-                "app.services.invite_service.invite_cognito_user"
-            ) as mock_cognito:
+            with patch("app.invites.service.invite_cognito_user") as mock_cognito:
                 with patch(
                     "app.users.service.create_placeholder_user"
                 ) as mock_placeholder:
@@ -162,9 +160,7 @@ async def test_invite_existing_email_does_not_call_cognito(app, client):
     with _org_dependency_overrides(app, membership):
         with patch("app.users.service.find_user_by_email", return_value=existing_user):
             with patch("app.orgs.service.find_existing_membership", return_value=None):
-                with patch(
-                    "app.services.invite_service.invite_cognito_user"
-                ) as mock_cognito:
+                with patch("app.invites.service.invite_cognito_user") as mock_cognito:
                     with patch("app.orgs.service.create_membership") as mock_create:
                         mock_create.return_value = MagicMock(
                             id=uuid.uuid4(),

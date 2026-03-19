@@ -12,12 +12,12 @@ from app.orgs.deps import (
 from app.core.database import get_db
 from app.models.org_membership import OrgMembership
 from app.models.supplier import Supplier
-from app.schemas.supplier import (
+from app.suppliers.schemas import (
     SupplierCreate,
     SupplierUpdate,
     SupplierResponse,
 )
-from app.services import supplier_service
+from app.suppliers import service as supplier_service
 
 router = APIRouter(prefix="/api/suppliers", tags=["suppliers"])
 

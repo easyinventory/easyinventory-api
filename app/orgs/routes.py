@@ -30,7 +30,7 @@ from app.orgs.schemas import (
 )
 from app.orgs import service as org_service
 from app.users import service as user_service
-from app.services.invite_service import invite_user_to_org
+from app.invites.service import invite_user_to_org
 
 router = APIRouter(prefix="/api/orgs", tags=["organizations"])
 
