@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from app.core.bootstrap import run_bootstrap
+from app.bootstrap.seeder import run_bootstrap
 from app.core.config import settings
 from app.core.database import async_session, engine
 from app.core.exceptions import AppError
