@@ -80,7 +80,15 @@ def app(db: AsyncSession):
     application = create_app()
 
     async def _override_get_db():
-        yield db
+        # Mirror production get_db semantics: per-request transaction
+        # with commit on success and rollback on error, inside the
+        # per-test outer transaction provided by the ``db`` fixture.
+        async with db.begin():
+            try:
+                yield db
+            except Exception:
+                await db.rollback()
+                raise
 
     application.dependency_overrides[get_db] = _override_get_db
     return application
