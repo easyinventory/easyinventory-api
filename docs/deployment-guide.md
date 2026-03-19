@@ -111,7 +111,7 @@ Create a `.env.prod` file on your server with the following variables:
 | `AWS_REGION` | `us-east-1` | AWS region for ECR and CloudWatch |
 | `AWS_ACCOUNT_ID` | `123456789012` | Your AWS account ID |
 | `COGNITO_REGION` | `us-east-2` | Region of your Cognito User Pool |
-| `COGNITO_USER_POOL_ID` | `us-east-2_Fc70cHz7B` | Cognito User Pool ID |
+| `COGNITO_USER_POOL_ID` | `us-east-2_XXXXXXXXX` | Cognito User Pool ID |
 | `COGNITO_APP_CLIENT_ID` | `4bjjm8t2...` | Cognito App Client ID |
 | `CORS_ORIGINS` | `https://<your-domain>` | Allowed CORS origins (comma-separated) |
 

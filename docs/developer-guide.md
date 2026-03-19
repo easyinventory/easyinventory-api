@@ -22,14 +22,16 @@ Everything you need to contribute to the EasyInventory API: coding standards, te
 
 ## Development Workflow
 
-1. **Pull the latest `main`** — `git pull origin main`
+1. **Pull the latest `development`** — `git pull origin development`
 2. **Create a feature branch** — `git checkout -b feature/my-feature`
 3. **Make your changes** — follow the patterns below
 4. **Run formatting** — `make format`
 5. **Run type checking** — `make typecheck`
 6. **Run tests** — `make test` (mocked) and/or `make test-v2` (real DB)
 7. **Commit** — use conventional commit messages
-8. **Push and create a PR**
+8. **Push and create a PR** into `development`
+
+> **Branch strategy:** Feature branches are merged into `development`. When a release is ready, `development` is merged into `main`.
 
 ---
 
@@ -531,14 +533,17 @@ Auth, org membership, and database sessions are injected via FastAPI `Depends()`
 
 ## Git Workflow
 
-### Branch naming
+### Branching model
 
 ```
-feature/add-categories
-fix/supplier-delete-cascade
-chore/update-dependencies
-refactor/auth-middleware
+main           ← production releases only
+└── development  ← integration branch (merge feature branches here)
+    ├── feature/add-categories
+    ├── fix/supplier-delete-cascade
+    └── refactor/auth-middleware
 ```
+
+All feature branches are created from and merged back into `development`. When a release is ready, `development` is merged into `main`.
 
 ### Commit messages
 
@@ -555,7 +560,7 @@ docs: add deployment guide
 
 ### PR checklist
 
-Before creating a pull request:
+Before creating a pull request into `development`:
 
 - [ ] `make format` — code is formatted
 - [ ] `make typecheck` — no type errors
