@@ -122,9 +122,7 @@ async def test_create_product_returns_201(app, client):
     new_product = _mock_product(org_id=membership.org_id)
 
     with _product_dependency_overrides(app, membership):
-        with patch(
-            "app.products.service.create_product", return_value=new_product
-        ):
+        with patch("app.products.service.create_product", return_value=new_product):
             response = await client.post(
                 "/api/products",
                 json={"name": "Test Product", "sku": "TST-001"},
@@ -142,9 +140,7 @@ async def test_update_product_returns_200(app, client):
 
     with _product_dependency_overrides(app, membership):
         with patch("app.products.service.get_product", return_value=product):
-            with patch(
-                "app.products.service.update_product", return_value=updated
-            ):
+            with patch("app.products.service.update_product", return_value=updated):
                 response = await client.put(
                     f"/api/products/{product.id}",
                     json={"name": "Updated Product"},
