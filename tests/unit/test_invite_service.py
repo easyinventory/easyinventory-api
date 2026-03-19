@@ -1,4 +1,4 @@
-"""Tests for app.services.invite_service — shared invite orchestration."""
+"""Tests for app.invites.service — shared invite orchestration."""
 
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -9,7 +9,7 @@ from app.core.exceptions import AlreadyExists
 from app.core.roles import OrgRole
 from app.models.org_membership import OrgMembership
 from app.models.user import User
-from app.services.invite_service import invite_user_to_org
+from app.invites.service import invite_user_to_org
 
 
 def _mock_db():
@@ -33,8 +33,8 @@ def _mock_membership(is_active=True):
 # ── Case 1: Existing user, not a member ──
 
 
-@patch("app.services.invite_service.org_service")
-@patch("app.services.invite_service.user_service")
+@patch("app.invites.service.org_service")
+@patch("app.invites.service.user_service")
 async def test_existing_user_gets_active_membership(mock_user_svc, mock_org_svc):
     """Known user who isn't a member → active membership, no Cognito call."""
     user = _mock_user()
@@ -67,8 +67,8 @@ async def test_existing_user_gets_active_membership(mock_user_svc, mock_org_svc)
 # ── Case 2: Existing user, already a member ──
 
 
-@patch("app.services.invite_service.org_service")
-@patch("app.services.invite_service.user_service")
+@patch("app.invites.service.org_service")
+@patch("app.invites.service.user_service")
 async def test_active_member_raises_already_exists(mock_user_svc, mock_org_svc):
     """User who is already an active member → AlreadyExists."""
     user = _mock_user()
@@ -86,8 +86,8 @@ async def test_active_member_raises_already_exists(mock_user_svc, mock_org_svc):
         )
 
 
-@patch("app.services.invite_service.org_service")
-@patch("app.services.invite_service.user_service")
+@patch("app.invites.service.org_service")
+@patch("app.invites.service.user_service")
 async def test_pending_invite_raises_already_exists(mock_user_svc, mock_org_svc):
     """User with a pending (inactive) invite → AlreadyExists."""
     user = _mock_user()
@@ -108,9 +108,9 @@ async def test_pending_invite_raises_already_exists(mock_user_svc, mock_org_svc)
 # ── Case 3: Unknown email ──
 
 
-@patch("app.services.invite_service.invite_cognito_user")
-@patch("app.services.invite_service.org_service")
-@patch("app.services.invite_service.user_service")
+@patch("app.invites.service.invite_cognito_user")
+@patch("app.invites.service.org_service")
+@patch("app.invites.service.user_service")
 async def test_unknown_email_creates_cognito_and_placeholder(
     mock_user_svc, mock_org_svc, mock_cognito
 ):
@@ -147,8 +147,8 @@ async def test_unknown_email_creates_cognito_and_placeholder(
 # ── is_new_org flag ──
 
 
-@patch("app.services.invite_service.org_service")
-@patch("app.services.invite_service.user_service")
+@patch("app.invites.service.org_service")
+@patch("app.invites.service.user_service")
 async def test_is_new_org_skips_duplicate_check(mock_user_svc, mock_org_svc):
     """When is_new_org=True, don't bother checking for existing membership."""
     user = _mock_user()

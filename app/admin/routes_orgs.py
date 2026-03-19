@@ -21,7 +21,7 @@ from app.models.organization import Organization
 from app.models.user import User
 from app.orgs import service as org_service
 from app.orgs.schemas import OrgMemberDetail
-from app.services.invite_service import invite_user_to_org
+from app.invites.service import invite_user_to_org
 from app.users import service as user_service
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
