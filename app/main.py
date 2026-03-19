@@ -13,7 +13,8 @@ from app.core.config import settings
 from app.core.database import async_session, engine
 from app.core.exceptions import AppError
 from app.core.middleware import JsonFormatter, RequestLoggingMiddleware
-from app.api.routes import health, auth, admin, orgs, suppliers, products
+from app.auth.routes import router as auth_router
+from app.api.routes import health, admin, orgs, suppliers, products
 
 # ── Structured JSON logging to stdout → Docker → CloudWatch ──
 handler = logging.StreamHandler(sys.stdout)
@@ -69,7 +70,7 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestLoggingMiddleware)
 
     app.include_router(health.router)
-    app.include_router(auth.router)
+    app.include_router(auth_router)
     app.include_router(admin.router)
     app.include_router(orgs.router)
     app.include_router(suppliers.router)
