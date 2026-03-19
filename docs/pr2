@@ -1,0 +1,41 @@
+PR 2 — refactor: extract orgs, admin, and users domains
+Why second: This is the biggest structural change — breaking the org_service.py god module. Depends on PR 1 (auth deps already extracted).
+
+Commits:
+
+refactor: extract org deps, permissions, routes, and schemas
+
+Move get_current_org_membership, require_org_role from api/deps.py → orgs/deps.py
+Move api/permissions.py → orgs/permissions.py
+Move api/routes/orgs.py → orgs/routes.py
+Move schemas/org.py → orgs/schemas.py
+Update imports in the moved files + add re-export shims at old locations
+refactor: split org_service into orgs/service.py, admin/service.py, users/service.py
+
+Member CRUD functions (7) → orgs/service.py
+System-admin functions (6: list_all_orgs, get_org_by_id, rename_org, delete_org, transfer_ownership, list_all_users) → admin/service.py
+User lookup functions (3: get_user_by_id, find_user_by_email, create_placeholder_user) → users/service.py (merged with existing get_or_create_user and delete_user_completely)
+Add re-export shim at services/org_service.py
+refactor: split admin routes into routes_orgs.py and routes_users.py
+
+Org CRUD + transfer + member introspection (7 endpoints + _get_org_or_404 helper) → admin/routes_orgs.py
+User list + delete (2 endpoints) → admin/routes_users.py
+Move schemas/admin.py → admin/schemas.py
+Update main.py to register admin_orgs_router + admin_users_router instead of single admin_router
+refactor: update all imports to use domain modules directly
+
+Replace from app.services.org_service import ... with proper domain imports
+Replace from app.api.deps import get_current_org_membership with from app.orgs.deps import ...
+Replace from app.api.permissions import ... with from app.orgs.permissions import ...
+Replace from app.schemas.org import ... with from app.orgs.schemas import ...
+Replace from app.schemas.admin import ... with from app.admin.schemas import ...
+Update all test patches accordingly
+Remove re-export shims
+chore: delete emptied legacy files
+
+Delete services/org_service.py, api/deps.py, api/permissions.py, api/routes/admin.py, api/routes/orgs.py, schemas/admin.py, schemas/org.py
+Files touched: ~20 source files, ~20 test files
+
+PR description:
+
+Breaks the org_service.py god module (330 lines, 15+ functions) into three focused services: orgs/service.py (member CRUD), admin/service.py (system-admin operations), users/service.py (user lookups + lifecycle). Splits admin routes by sub-domain (org management vs user management). Extracts org-specific dependencies and permissions into orgs/. Uses re-export shims at each commit boundary to keep CI green.

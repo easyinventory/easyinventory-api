@@ -1,10 +1,10 @@
 """Tests for cognito email lookup from access token."""
 
 from unittest.mock import patch, MagicMock
-from app.core.cognito import get_email_from_access_token
+from app.auth.cognito_token import get_email_from_access_token
 
 
-@patch("app.core.cognito._get_cognito_client")
+@patch("app.auth.cognito_admin._get_cognito_client")
 def test_returns_email_from_user_attributes(mock_get_client):
     """Should extract email from Cognito GetUser response."""
     mock_client = MagicMock()
@@ -24,7 +24,7 @@ def test_returns_email_from_user_attributes(mock_get_client):
     mock_client.get_user.assert_called_once_with(AccessToken="fake-access-token")
 
 
-@patch("app.core.cognito._get_cognito_client")
+@patch("app.auth.cognito_admin._get_cognito_client")
 def test_returns_empty_string_on_exception(mock_get_client):
     """Should return '' if the API call fails (don't crash the request)."""
     mock_client = MagicMock()
@@ -36,7 +36,7 @@ def test_returns_empty_string_on_exception(mock_get_client):
     assert result == ""
 
 
-@patch("app.core.cognito._get_cognito_client")
+@patch("app.auth.cognito_admin._get_cognito_client")
 def test_returns_empty_string_if_no_email_attribute(mock_get_client):
     """Should return '' if email attribute is missing from response."""
     mock_client = MagicMock()

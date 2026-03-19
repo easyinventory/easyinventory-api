@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi import HTTPException
 
-from app.api.deps import require_role
+from app.auth.deps import require_role
 from app.core.roles import SystemRole
 from app.models.user import User
 

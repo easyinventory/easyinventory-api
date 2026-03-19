@@ -53,9 +53,9 @@ async def test_non_admin_cannot_create_org(client):
     user = _mock_regular_user()
 
     with patch(
-        "app.api.deps.verify_token", return_value={"sub": "abc", "email": user.email}
+        "app.auth.deps.verify_token", return_value={"sub": "abc", "email": user.email}
     ):
-        with patch("app.api.deps.get_or_create_user", return_value=user):
+        with patch("app.auth.deps.get_or_create_user", return_value=user):
             response = await client.post(
                 "/api/admin/orgs",
                 json={"name": "New Org", "owner_email": "owner@test.com"},
@@ -78,10 +78,10 @@ async def test_admin_can_create_org_with_new_email(app, client):
 
     with _db_override(app, mock_db):
         with patch(
-            "app.api.deps.verify_token",
+            "app.auth.deps.verify_token",
             return_value={"sub": "abc", "email": admin.email},
         ):
-            with patch("app.api.deps.get_or_create_user", return_value=admin):
+            with patch("app.auth.deps.get_or_create_user", return_value=admin):
                 with patch(
                     "app.services.invite_service.org_service.find_user_by_email",
                     return_value=None,
@@ -121,10 +121,10 @@ async def test_admin_can_create_org_with_existing_user(app, client):
 
     with _db_override(app, mock_db):
         with patch(
-            "app.api.deps.verify_token",
+            "app.auth.deps.verify_token",
             return_value={"sub": "abc", "email": admin.email},
         ):
-            with patch("app.api.deps.get_or_create_user", return_value=admin):
+            with patch("app.auth.deps.get_or_create_user", return_value=admin):
                 with patch(
                     "app.services.org_service.find_user_by_email",
                     return_value=existing_user,
@@ -162,9 +162,9 @@ async def test_create_org_returns_401_without_token(client):
 async def test_list_orgs_returns_403_for_non_admin(client):
     user = _mock_regular_user()
     with patch(
-        "app.api.deps.verify_token", return_value={"sub": "abc", "email": user.email}
+        "app.auth.deps.verify_token", return_value={"sub": "abc", "email": user.email}
     ):
-        with patch("app.api.deps.get_or_create_user", return_value=user):
+        with patch("app.auth.deps.get_or_create_user", return_value=user):
             response = await client.get(
                 "/api/admin/orgs",
                 headers={"Authorization": "Bearer fake"},
@@ -180,10 +180,10 @@ async def test_admin_can_delete_user_system_and_cognito(client):
     target.cognito_sub = "sub-delete-me"
 
     with patch(
-        "app.api.deps.verify_token",
+        "app.auth.deps.verify_token",
         return_value={"sub": "abc", "email": admin.email},
     ):
-        with patch("app.api.deps.get_or_create_user", return_value=admin):
+        with patch("app.auth.deps.get_or_create_user", return_value=admin):
             with patch(
                 "app.api.routes.admin.org_service.get_user_by_id", return_value=target
             ):
@@ -209,10 +209,10 @@ async def test_admin_delete_user_returns_404_for_missing_user(client):
     missing_id = uuid.uuid4()
 
     with patch(
-        "app.api.deps.verify_token",
+        "app.auth.deps.verify_token",
         return_value={"sub": "abc", "email": admin.email},
     ):
-        with patch("app.api.deps.get_or_create_user", return_value=admin):
+        with patch("app.auth.deps.get_or_create_user", return_value=admin):
             with patch(
                 "app.api.routes.admin.org_service.get_user_by_id", return_value=None
             ):
@@ -228,10 +228,10 @@ async def test_admin_cannot_delete_own_account(client):
     admin = _mock_admin()
 
     with patch(
-        "app.api.deps.verify_token",
+        "app.auth.deps.verify_token",
         return_value={"sub": "abc", "email": admin.email},
     ):
-        with patch("app.api.deps.get_or_create_user", return_value=admin):
+        with patch("app.auth.deps.get_or_create_user", return_value=admin):
             with patch(
                 "app.api.routes.admin.org_service.get_user_by_id", return_value=admin
             ):

@@ -21,10 +21,10 @@ def _mock_user(**overrides):
 async def test_admin_endpoint_returns_403_for_regular_user(client):
     mock_user = _mock_user(system_role="SYSTEM_USER")
     with patch(
-        "app.api.deps.verify_token",
+        "app.auth.deps.verify_token",
         return_value={"sub": "abc-123", "email": "test@example.com"},
     ):
-        with patch("app.api.deps.get_or_create_user", return_value=mock_user):
+        with patch("app.auth.deps.get_or_create_user", return_value=mock_user):
             response = await client.get(
                 "/api/admin/status",
                 headers={"Authorization": "Bearer fake-token"},
@@ -38,10 +38,10 @@ async def test_admin_endpoint_returns_200_for_admin(client):
         email="admin@company.com",
     )
     with patch(
-        "app.api.deps.verify_token",
+        "app.auth.deps.verify_token",
         return_value={"sub": "admin-sub", "email": "admin@company.com"},
     ):
-        with patch("app.api.deps.get_or_create_user", return_value=mock_user):
+        with patch("app.auth.deps.get_or_create_user", return_value=mock_user):
             response = await client.get(
                 "/api/admin/status",
                 headers={"Authorization": "Bearer fake-token"},
@@ -60,10 +60,10 @@ async def test_admin_endpoint_returns_401_without_token(client):
 async def test_admin_endpoint_returns_403_detail(client):
     mock_user = _mock_user(system_role="SYSTEM_USER")
     with patch(
-        "app.api.deps.verify_token",
+        "app.auth.deps.verify_token",
         return_value={"sub": "abc-123", "email": "test@example.com"},
     ):
-        with patch("app.api.deps.get_or_create_user", return_value=mock_user):
+        with patch("app.auth.deps.get_or_create_user", return_value=mock_user):
             response = await client.get(
                 "/api/admin/status",
                 headers={"Authorization": "Bearer fake-token"},
