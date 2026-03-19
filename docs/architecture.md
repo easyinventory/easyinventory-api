@@ -51,10 +51,10 @@ easyinventory-api/
 │   │   └── service.py           #   Member CRUD (pure database operations)
 │   │
 │   ├── admin/                   # System admin domain (SYSTEM_ADMIN only)
-│   │   ├── routes_orgs.py       #   Org CRUD, ownership transfer, member introspection
-│   │   ├── routes_users.py      #   User listing and deletion (DB + Cognito)
+│   │   ├── routes_orgs.py       #   Org CRUD, ownership transfer, member introspection (delegates to service)
+│   │   ├── routes_users.py      #   User listing and deletion (delegates to service + Cognito)
 │   │   ├── schemas.py           #   Admin-specific schemas
-│   │   └── service.py           #   System-admin database operations
+│   │   └── service.py           #   Aggregate queries, org/user CRUD, dataclasses for query results
 │   │
 │   ├── products/                # Products domain
 │   │   ├── routes.py            #   Product CRUD + product-supplier link endpoints
@@ -140,7 +140,7 @@ Every feature domain in the `app/` directory follows the same **3-file pattern**
 |---|---|---|
 | `routes.py` | HTTP endpoint definitions. Parses requests, wires auth dependencies, serializes responses. | HTTP, FastAPI, Pydantic schemas |
 | `schemas.py` | Pydantic models for request bodies and response shapes. Handles validation and serialization. | Pydantic only |
-| `service.py` | Pure database operations. Accepts a `db` session, returns ORM model instances. **Never raises HTTP exceptions.** | SQLAlchemy, ORM models, domain exceptions |
+| `service.py` | Pure database operations. Accepts a `db` session, returns ORM model instances or domain-specific dataclasses. **Never raises HTTP exceptions.** | SQLAlchemy, ORM models, domain exceptions |
 
 ### Why this separation matters
 

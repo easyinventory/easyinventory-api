@@ -489,7 +489,7 @@ Every domain follows the same 3-file pattern. See [Architecture: Domain Module P
 
 ### 2. Service functions are pure database operations
 
-Services accept `db: AsyncSession` and other arguments. They return ORM model instances. They **never** raise `HTTPException` — they raise domain exceptions from `app/core/exceptions.py`.
+Services accept `db: AsyncSession` and other arguments. They return ORM model instances or domain-specific dataclasses (e.g. when the result involves aggregates that don't map 1:1 to a model). They **never** raise `HTTPException` — they raise domain exceptions from `app/core/exceptions.py`.
 
 ### 3. Org-scoping
 

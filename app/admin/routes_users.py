@@ -5,7 +5,6 @@ Admin user routes — system-admin user management endpoints.
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.admin import service as admin_service
@@ -14,7 +13,6 @@ from app.auth.cognito_admin import delete_cognito_user
 from app.auth.deps import RequireRole
 from app.core.database import get_db
 from app.core.roles import SystemRole
-from app.models.membership import Membership
 from app.models.user import User
 from app.users import service as user_service
 
@@ -27,37 +25,17 @@ async def list_users(
     db: AsyncSession = Depends(get_db),
 ) -> list[UserListItem]:
     """List all users across all orgs. System admin only."""
-    users = await admin_service.list_all_users(db)
-
-    # Precompute active-organization counts per user in SQL to avoid
-    # materializing full membership collections for every user.
-    user_ids = [user.id for user in users]
-    org_counts: dict[uuid.UUID, int] = {}
-    if user_ids:
-        stmt = (
-            select(Membership.user_id, func.count(Membership.id))
-            .where(
-                Membership.user_id.in_(user_ids),
-                Membership.is_active.is_(True),
-            )
-            .group_by(Membership.user_id)
-        )
-        result = await db.execute(stmt)
-        org_counts = {
-            user_id: count
-            for user_id, count in result.all()
-        }
-
+    rows = await admin_service.list_users_with_org_counts(db)
     return [
         UserListItem(
-            id=user.id,
-            email=user.email,
-            system_role=user.system_role,
-            is_active=user.is_active,
-            created_at=user.created_at,
-            org_count=org_counts.get(user.id, 0),
+            id=row.id,
+            email=row.email,
+            system_role=row.system_role,
+            is_active=row.is_active,
+            created_at=row.created_at,
+            org_count=row.org_count,
         )
-        for user in users
+        for row in rows
     ]
 
 
