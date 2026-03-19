@@ -9,8 +9,9 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import noload, with_expression
 
 from app.core.exceptions import InvalidRole, NotFound
 from app.core.roles import OrgRole
@@ -19,12 +20,43 @@ from app.models.org_membership import OrgMembership
 from app.models.user import User
 
 
+def _owner_email_subquery():
+    """Correlated subquery that returns the owner's email for an org row."""
+    return (
+        select(User.email)
+        .join(OrgMembership, OrgMembership.user_id == User.id)
+        .where(OrgMembership.org_id == Organization.id)
+        .where(OrgMembership.org_role == OrgRole.OWNER)
+        .correlate(Organization)
+        .scalar_subquery()
+    )
+
+
+def _member_count_subquery():
+    """Correlated subquery that returns the total membership count for an org row."""
+    return (
+        select(func.count())
+        .select_from(OrgMembership)
+        .where(OrgMembership.org_id == Organization.id)
+        .correlate(Organization)
+        .scalar_subquery()
+    )
+
+
 async def list_all_orgs(db: AsyncSession) -> list[Organization]:
     """
-    List all organizations with memberships and users loaded.
+    List all organizations with owner_email and member_count computed in SQL.
     System admin only — returns data across all orgs.
     """
-    stmt = select(Organization).order_by(Organization.created_at.desc())
+    stmt = (
+        select(Organization)
+        .options(
+            noload(Organization.memberships),
+            with_expression(Organization.owner_email, _owner_email_subquery()),
+            with_expression(Organization.member_count, _member_count_subquery()),
+        )
+        .order_by(Organization.created_at.desc())
+    )
     result = await db.execute(stmt)
     return list(result.scalars().all())
 
@@ -35,6 +67,24 @@ async def get_org_by_id(
 ) -> Optional[Organization]:
     """Fetch an organization by ID."""
     stmt = select(Organization).where(Organization.id == org_id)
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def get_org_by_id_with_stats(
+    db: AsyncSession,
+    org_id: uuid.UUID,
+) -> Optional[Organization]:
+    """Fetch an organization by ID with owner_email and member_count computed in SQL."""
+    stmt = (
+        select(Organization)
+        .where(Organization.id == org_id)
+        .options(
+            noload(Organization.memberships),
+            with_expression(Organization.owner_email, _owner_email_subquery()),
+            with_expression(Organization.member_count, _member_count_subquery()),
+        )
+    )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
 

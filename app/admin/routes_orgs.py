@@ -108,11 +108,8 @@ async def list_orgs(
             id=org.id,
             name=org.name,
             created_at=org.created_at,
-            owner_email=next(
-                (m.user.email for m in org.memberships if m.org_role == OrgRole.OWNER),
-                None,
-            ),
-            member_count=len(org.memberships),
+            owner_email=org.owner_email,
+            member_count=org.member_count,
         )
         for org in orgs
     ]
@@ -129,15 +126,17 @@ async def rename_org(
     org = await _get_org_or_404(db, org_id)
     org = await admin_service.rename_org(db, org, body.name)
 
+    # Re-fetch with SQL-computed stats to avoid iterating memberships in Python
+    updated_org = await admin_service.get_org_by_id_with_stats(db, org_id)
+    if updated_org is None:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
     return OrgListItem(
-        id=org.id,
-        name=org.name,
-        created_at=org.created_at,
-        owner_email=next(
-            (m.user.email for m in org.memberships if m.org_role == OrgRole.OWNER),
-            None,
-        ),
-        member_count=len(org.memberships),
+        id=updated_org.id,
+        name=updated_org.name,
+        created_at=updated_org.created_at,
+        owner_email=updated_org.owner_email,
+        member_count=updated_org.member_count,
     )
 
 
