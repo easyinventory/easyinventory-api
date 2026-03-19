@@ -17,7 +17,7 @@ from app.auth.routes import router as auth_router
 from app.orgs.routes import router as orgs_router
 from app.admin.routes_orgs import router as admin_orgs_router
 from app.admin.routes_users import router as admin_users_router
-from app.api.routes import health
+from app.health.routes import router as health_router
 from app.products.routes import router as products_router
 from app.suppliers.routes import router as suppliers_router
 
@@ -74,7 +74,7 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(RequestLoggingMiddleware)
 
-    app.include_router(health.router)
+    app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(admin_orgs_router)
     app.include_router(admin_users_router)
