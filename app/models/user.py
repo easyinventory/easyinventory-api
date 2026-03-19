@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Boolean, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, query_expression, relationship
 
 from app.core.roles import SystemRole
 from app.models.base import BaseModel
@@ -28,3 +28,6 @@ class User(BaseModel):
     memberships: Mapped[list[OrgMembership]] = relationship(
         back_populates="user", lazy="selectin"
     )
+
+    # Computed via with_expression() in queries that need it (e.g. admin list)
+    active_org_count: Mapped[Optional[int]] = query_expression()

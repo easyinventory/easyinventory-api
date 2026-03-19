@@ -33,7 +33,7 @@ async def list_users(
             system_role=user.system_role,
             is_active=user.is_active,
             created_at=user.created_at,
-            org_count=len([m for m in user.memberships if m.is_active]),
+            org_count=user.active_org_count or 0,
         )
         for user in users
     ]

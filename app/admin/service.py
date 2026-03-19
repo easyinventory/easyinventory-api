@@ -9,8 +9,9 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import with_expression
 
 from app.core.exceptions import InvalidRole, NotFound
 from app.core.roles import OrgRole
@@ -106,7 +107,18 @@ async def transfer_ownership(
 
 
 async def list_all_users(db: AsyncSession) -> list[User]:
-    """List all users with memberships loaded."""
-    stmt = select(User).order_by(User.created_at.desc())
+    """List all users with active org count computed in SQL."""
+    active_count_subq = (
+        select(func.count())
+        .where(OrgMembership.user_id == User.id)
+        .where(OrgMembership.is_active.is_(True))
+        .correlate(User)
+        .scalar_subquery()
+    )
+    stmt = (
+        select(User)
+        .options(with_expression(User.active_org_count, active_count_subq))
+        .order_by(User.created_at.desc())
+    )
     result = await db.execute(stmt)
     return list(result.scalars().all())
