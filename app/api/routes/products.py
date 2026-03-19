@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_org_membership, require_org_role
+from app.orgs.deps import get_current_org_membership, require_org_role
 from app.core.database import get_db
 from app.models.org_membership import OrgMembership
 from app.models.product import Product

@@ -2,7 +2,7 @@ import uuid
 import pytest
 from unittest.mock import MagicMock
 from fastapi import HTTPException
-from app.api.deps import require_org_role
+from app.orgs.deps import require_org_role
 from app.core.roles import OrgRole
 from app.models.org_membership import OrgMembership
 

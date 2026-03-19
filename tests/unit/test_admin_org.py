@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 async def test_list_all_orgs_query_executes():
     """list_all_orgs should execute a query and return results."""
-    from app.services.org_service import list_all_orgs
+    from app.admin.service import list_all_orgs
 
     mock_row = MagicMock()
     mock_row.id = uuid.uuid4()

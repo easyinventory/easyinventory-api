@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 
 from app.auth.deps import get_current_user
-from app.api.deps import get_current_org_membership
+from app.orgs.deps import get_current_org_membership
 from app.models.org_membership import OrgMembership
 from app.models.user import User
 

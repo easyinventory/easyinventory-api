@@ -3,7 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock
 import uuid
 
-from app.services.user_service import delete_user_completely, get_or_create_user
+from app.users.service import delete_user_completely, get_or_create_user
 from app.core.roles import SystemRole
 from app.models.org_membership import OrgMembership
 from app.models.user import User
