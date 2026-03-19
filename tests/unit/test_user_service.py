@@ -1,4 +1,4 @@
-"""Tests for app.services.user_service — user provisioning + placeholder claiming."""
+"""Tests for app.users.service — user provisioning + placeholder claiming."""
 
 from unittest.mock import AsyncMock, MagicMock
 import uuid
