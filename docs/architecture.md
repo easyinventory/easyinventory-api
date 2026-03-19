@@ -39,12 +39,12 @@ easyinventory-api/
 │   ├── auth/                    # Authentication domain (AWS Cognito)
 │   │   ├── cognito_token.py     #   JWKS fetching, JWT verification (runs on every request)
 │   │   ├── cognito_admin.py     #   Cognito admin ops: invite user, delete user (cold path)
-│   │   ├── deps.py              #   FastAPI dependencies: get_current_user, require_role
+│   │   ├── deps.py              #   FastAPI dependencies: get_current_user, RequireRole
 │   │   ├── routes.py            #   GET /api/me
 │   │   └── schemas.py           #   UserResponse schema
 │   │
 │   ├── orgs/                    # Organization management domain
-│   │   ├── deps.py              #   get_current_org_membership, require_org_role dependencies
+│   │   ├── deps.py              #   get_current_org_membership, RequireOrgRole dependencies
 │   │   ├── permissions.py       #   Permission assertion helpers (raise domain exceptions)
 │   │   ├── routes.py            #   Member list, invite, role change, activate/deactivate
 │   │   ├── schemas.py           #   Org-related Pydantic schemas
@@ -308,7 +308,7 @@ The application uses **AWS Cognito** for user authentication. Users sign up and 
 |---|---|---|
 | `app/auth/cognito_token.py` | Fetches JWKS, verifies JWT signature/claims | **Every authenticated request** (hot path) |
 | `app/auth/cognito_admin.py` | Creates Cognito accounts for invitees, deletes users | Only during invite/delete operations (cold path) |
-| `app/auth/deps.py` | FastAPI dependencies: `get_current_user`, `require_role` | Every authenticated endpoint |
+| `app/auth/deps.py` | FastAPI dependencies: `get_current_user`, `RequireRole` | Every authenticated endpoint |
 
 ### JWKS caching
 
