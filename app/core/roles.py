@@ -7,8 +7,8 @@ Usage:
     if user.system_role == SystemRole.ADMIN:
         ...
 
-    require_role(SystemRole.ADMIN)
-    require_org_role(OrgRole.OWNER, OrgRole.ADMIN)
+    RequireRole(SystemRole.ADMIN)
+    RequireOrgRole(OrgRole.OWNER, OrgRole.ADMIN)
 
 These are plain string constants (not enums) so they stay compatible
 with SQLAlchemy column defaults, Pydantic schemas, and existing DB

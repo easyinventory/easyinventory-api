@@ -389,7 +389,7 @@ async def list_suppliers(
 # Only owners and admins can delete
 @router.delete("/api/suppliers/{id}")
 async def delete_supplier(
-    membership: OrgMembership = Depends(require_org_role("ORG_OWNER", "ORG_ADMIN")),
+    membership: OrgMembership = Depends(RequireOrgRole("ORG_OWNER", "ORG_ADMIN")),
     ...
 )
 ```

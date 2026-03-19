@@ -14,7 +14,7 @@ from app.admin.schemas import (
     TransferOwnershipRequest,
     UpdateOrgRequest,
 )
-from app.auth.deps import require_role
+from app.auth.deps import RequireRole
 from app.core.database import get_db
 from app.core.roles import OrgRole, SystemRole
 from app.models.org_membership import OrgMembership
@@ -45,7 +45,7 @@ async def _get_org_or_404(
 
 @router.get("/status")
 async def admin_status(
-    user: User = Depends(require_role(SystemRole.ADMIN)),
+    user: User = Depends(RequireRole(SystemRole.ADMIN)),
 ) -> dict:
     """
     Admin-only endpoint for testing role enforcement.
@@ -66,7 +66,7 @@ async def admin_status(
 @router.post("/orgs", response_model=OrgListItem, status_code=201)
 async def create_org(
     body: CreateOrgRequest,
-    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    current_user: User = Depends(RequireRole(SystemRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> OrgListItem:
     """
@@ -98,7 +98,7 @@ async def create_org(
 
 @router.get("/orgs", response_model=list[OrgListItem])
 async def list_orgs(
-    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    current_user: User = Depends(RequireRole(SystemRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> list[OrgListItem]:
     """List all organizations. System admin only."""
@@ -122,7 +122,7 @@ async def list_orgs(
 async def rename_org(
     org_id: uuid.UUID,
     body: UpdateOrgRequest,
-    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    current_user: User = Depends(RequireRole(SystemRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> OrgListItem:
     """Rename an organization. System admin only."""
@@ -144,7 +144,7 @@ async def rename_org(
 @router.delete("/orgs/{org_id}", status_code=204)
 async def delete_org(
     org_id: uuid.UUID,
-    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    current_user: User = Depends(RequireRole(SystemRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete an organization and all its memberships. System admin only."""
@@ -156,7 +156,7 @@ async def delete_org(
 async def transfer_ownership(
     org_id: uuid.UUID,
     body: TransferOwnershipRequest,
-    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    current_user: User = Depends(RequireRole(SystemRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> OrgMembership:
     """Transfer org ownership to another member. System admin only."""
@@ -175,7 +175,7 @@ async def transfer_ownership(
 @router.get("/orgs/{org_id}/members", response_model=list[OrgMemberDetail])
 async def list_org_members(
     org_id: uuid.UUID,
-    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    current_user: User = Depends(RequireRole(SystemRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> list[OrgMembership]:
     """List all members of a specific org. System admin only."""

@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.auth.deps import get_current_user
 from app.orgs.deps import (
     get_current_org_membership,
-    require_org_role,
+    RequireOrgRole,
 )
 from app.orgs.permissions import (
     assert_admin_hierarchy,
@@ -83,7 +83,7 @@ async def list_members(
 async def invite_member(
     body: InviteMemberRequest,
     membership: OrgMembership = Depends(
-        require_org_role(OrgRole.OWNER, OrgRole.ADMIN),
+        RequireOrgRole(OrgRole.OWNER, OrgRole.ADMIN),
     ),
     db: AsyncSession = Depends(get_db),
 ) -> OrgMembership:
@@ -104,7 +104,7 @@ async def update_role(
     member_id: uuid.UUID,
     body: UpdateRoleRequest,
     membership: OrgMembership = Depends(
-        require_org_role(OrgRole.OWNER, OrgRole.ADMIN),
+        RequireOrgRole(OrgRole.OWNER, OrgRole.ADMIN),
     ),
     db: AsyncSession = Depends(get_db),
 ) -> OrgMembership:
@@ -123,7 +123,7 @@ async def update_role(
 async def deactivate_member(
     member_id: uuid.UUID,
     membership: OrgMembership = Depends(
-        require_org_role(OrgRole.OWNER, OrgRole.ADMIN),
+        RequireOrgRole(OrgRole.OWNER, OrgRole.ADMIN),
     ),
     db: AsyncSession = Depends(get_db),
 ) -> OrgMembership:
@@ -140,7 +140,7 @@ async def deactivate_member(
 async def activate_member(
     member_id: uuid.UUID,
     membership: OrgMembership = Depends(
-        require_org_role(OrgRole.OWNER, OrgRole.ADMIN),
+        RequireOrgRole(OrgRole.OWNER, OrgRole.ADMIN),
     ),
     db: AsyncSession = Depends(get_db),
 ) -> OrgMembership:
@@ -154,7 +154,7 @@ async def activate_member(
 async def remove_member(
     member_id: uuid.UUID,
     membership: OrgMembership = Depends(
-        require_org_role(OrgRole.OWNER, OrgRole.ADMIN),
+        RequireOrgRole(OrgRole.OWNER, OrgRole.ADMIN),
     ),
     db: AsyncSession = Depends(get_db),
 ) -> None:
