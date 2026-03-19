@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.admin import service as admin_service
 from app.admin.schemas import UserListItem
 from app.auth.cognito_admin import delete_cognito_user
-from app.auth.deps import require_role
+from app.auth.deps import RequireRole
 from app.core.database import get_db
 from app.core.roles import SystemRole
 from app.models.user import User
@@ -21,17 +21,28 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 @router.get("/users", response_model=list[UserListItem])
 async def list_users(
-    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    current_user: User = Depends(RequireRole(SystemRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
-) -> list[dict]:
+) -> list[UserListItem]:
     """List all users across all orgs. System admin only."""
-    return await admin_service.list_all_users(db)
+    rows = await admin_service.list_users_with_org_counts(db)
+    return [
+        UserListItem(
+            id=row.id,
+            email=row.email,
+            system_role=row.system_role,
+            is_active=row.is_active,
+            created_at=row.created_at,
+            org_count=row.org_count,
+        )
+        for row in rows
+    ]
 
 
 @router.delete("/users/{user_id}", status_code=204)
 async def delete_user(
     user_id: uuid.UUID,
-    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    current_user: User = Depends(RequireRole(SystemRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a user from the local system and Cognito."""

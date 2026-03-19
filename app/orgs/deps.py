@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
-from typing import Any
 
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import select
@@ -74,28 +72,31 @@ async def get_current_org_membership(
     return membership
 
 
-def require_org_role(*allowed_roles: str) -> Callable[..., Any]:
+class RequireOrgRole:
     """
-    Dependency factory: checks the user's org_role.
+    Callable dependency that checks the user's org_role.
 
-    Usage:
+    Usage::
+
         from app.core.roles import OrgRole
 
         @router.post("/invite")
         async def invite(
-            membership = Depends(require_org_role(OrgRole.OWNER, OrgRole.ADMIN)),
+            membership = Depends(RequireOrgRole(OrgRole.OWNER, OrgRole.ADMIN)),
         ):
             ...
     """
 
-    async def _check_org_role(
+    def __init__(self, *allowed_roles: str):
+        self.allowed_roles = allowed_roles
+
+    async def __call__(
+        self,
         membership: OrgMembership = Depends(get_current_org_membership),
     ) -> OrgMembership:
-        if membership.org_role not in allowed_roles:
+        if membership.org_role not in self.allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Insufficient org permissions",
             )
         return membership
-
-    return _check_org_role

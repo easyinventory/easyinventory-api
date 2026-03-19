@@ -14,15 +14,15 @@ from app.admin.schemas import (
     TransferOwnershipRequest,
     UpdateOrgRequest,
 )
-from app.auth.deps import require_role
+from app.auth.deps import RequireRole
 from app.core.database import get_db
 from app.core.roles import OrgRole, SystemRole
+from app.models.org_membership import OrgMembership
 from app.models.organization import Organization
 from app.models.user import User
 from app.orgs import service as org_service
 from app.orgs.schemas import OrgMemberDetail
 from app.invites.service import invite_user_to_org
-from app.users import service as user_service
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -45,7 +45,7 @@ async def _get_org_or_404(
 
 @router.get("/status")
 async def admin_status(
-    user: User = Depends(require_role(SystemRole.ADMIN)),
+    user: User = Depends(RequireRole(SystemRole.ADMIN)),
 ) -> dict:
     """
     Admin-only endpoint for testing role enforcement.
@@ -66,9 +66,9 @@ async def admin_status(
 @router.post("/orgs", response_model=OrgListItem, status_code=201)
 async def create_org(
     body: CreateOrgRequest,
-    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    current_user: User = Depends(RequireRole(SystemRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
-) -> dict:
+) -> OrgListItem:
     """
     Create a new organization and assign an owner.
 
@@ -87,51 +87,62 @@ async def create_org(
         is_new_org=True,
     )
 
-    return {
-        "id": org.id,
-        "name": org.name,
-        "created_at": org.created_at,
-        "owner_email": body.owner_email,
-        "member_count": 1,
-    }
+    return OrgListItem(
+        id=org.id,
+        name=org.name,
+        created_at=org.created_at,
+        owner_email=body.owner_email,
+        member_count=1,
+    )
 
 
 @router.get("/orgs", response_model=list[OrgListItem])
 async def list_orgs(
-    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    current_user: User = Depends(RequireRole(SystemRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
-) -> list[dict]:
+) -> list[OrgListItem]:
     """List all organizations. System admin only."""
-    return await admin_service.list_all_orgs(db)
+    rows = await admin_service.list_orgs_with_details(db)
+    return [
+        OrgListItem(
+            id=row.id,
+            name=row.name,
+            created_at=row.created_at,
+            owner_email=row.owner_email,
+            member_count=row.member_count,
+        )
+        for row in rows
+    ]
 
 
 @router.patch("/orgs/{org_id}", response_model=OrgListItem)
 async def rename_org(
     org_id: uuid.UUID,
     body: UpdateOrgRequest,
-    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    current_user: User = Depends(RequireRole(SystemRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
-) -> dict:
+) -> OrgListItem:
     """Rename an organization. System admin only."""
     org = await _get_org_or_404(db, org_id)
     org = await admin_service.rename_org(db, org, body.name)
 
-    # Re-fetch owner info for the response
-    all_orgs = await admin_service.list_all_orgs(db)
-    matched = next((o for o in all_orgs if o["id"] == org.id), None)
-    return matched or {
-        "id": org.id,
-        "name": org.name,
-        "created_at": org.created_at,
-        "owner_email": None,
-        "member_count": 0,
-    }
+    owner_email, member_count = await admin_service.get_org_owner_and_member_count(
+        db, org.id
+    )
+
+    return OrgListItem(
+        id=org.id,
+        name=org.name,
+        created_at=org.created_at,
+        owner_email=owner_email,
+        member_count=member_count,
+    )
 
 
 @router.delete("/orgs/{org_id}", status_code=204)
 async def delete_org(
     org_id: uuid.UUID,
-    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    current_user: User = Depends(RequireRole(SystemRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete an organization and all its memberships. System admin only."""
@@ -143,27 +154,17 @@ async def delete_org(
 async def transfer_ownership(
     org_id: uuid.UUID,
     body: TransferOwnershipRequest,
-    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    current_user: User = Depends(RequireRole(SystemRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
-) -> dict:
+) -> OrgMembership:
     """Transfer org ownership to another member. System admin only."""
     await _get_org_or_404(db, org_id)
 
-    new_owner_membership = await admin_service.transfer_ownership(
+    return await admin_service.transfer_ownership(
         db,
         org_id,
         body.new_owner_email,
     )
-
-    user = await user_service.get_user_by_id(db, new_owner_membership.user_id)
-    return {
-        "id": new_owner_membership.id,
-        "user_id": new_owner_membership.user_id,
-        "email": user.email if user else "",
-        "org_role": new_owner_membership.org_role,
-        "is_active": new_owner_membership.is_active,
-        "joined_at": new_owner_membership.joined_at,
-    }
 
 
 # ── Org member introspection ──
@@ -172,9 +173,9 @@ async def transfer_ownership(
 @router.get("/orgs/{org_id}/members", response_model=list[OrgMemberDetail])
 async def list_org_members(
     org_id: uuid.UUID,
-    current_user: User = Depends(require_role(SystemRole.ADMIN)),
+    current_user: User = Depends(RequireRole(SystemRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
-) -> list[dict]:
+) -> list[OrgMembership]:
     """List all members of a specific org. System admin only."""
     await _get_org_or_404(db, org_id)
     return await org_service.list_org_members(db=db, org_id=org_id)

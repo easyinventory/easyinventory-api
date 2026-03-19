@@ -42,3 +42,8 @@ class OrgMembership(BaseModel):
     organization: Mapped[Organization] = relationship(
         back_populates="memberships", lazy="selectin"
     )
+
+    @property
+    def email(self) -> str:
+        """Expose user email for Pydantic serialization."""
+        return self.user.email

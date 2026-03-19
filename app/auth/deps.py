@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Any
 
 from fastapi import Depends, HTTPException, status
@@ -61,16 +60,17 @@ async def get_current_user(
     return user
 
 
-def require_role(*allowed_roles: str) -> Callable[..., Any]:
+class RequireRole:
     """
-    Dependency factory that checks the user's system_role.
+    Callable dependency that checks the user's system_role.
 
-    Usage:
+    Usage::
+
         from app.core.roles import SystemRole
 
         @router.get("/admin-only")
         async def admin_only(
-            user: User = Depends(require_role(SystemRole.ADMIN)),
+            user: User = Depends(RequireRole(SystemRole.ADMIN)),
         ):
             ...
 
@@ -78,14 +78,16 @@ def require_role(*allowed_roles: str) -> Callable[..., Any]:
     Raises 403 if they don't.
     """
 
-    async def _check_role(
+    def __init__(self, *allowed_roles: str):
+        self.allowed_roles = allowed_roles
+
+    async def __call__(
+        self,
         current_user: User = Depends(get_current_user),
     ) -> User:
-        if current_user.system_role not in allowed_roles:
+        if current_user.system_role not in self.allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Insufficient permissions",
             )
         return current_user
-
-    return _check_role
