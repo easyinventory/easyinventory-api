@@ -45,14 +45,28 @@ jobs:
           make lint
           make format-check
 
-      - name: Test
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test
+        run: alembic upgrade head
+
+      - name: Test (existing suite)
         env:
           DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test
           COGNITO_REGION: us-east-2
           COGNITO_USER_POOL_ID: test
           COGNITO_APP_CLIENT_ID: test
           BOOTSTRAP_ADMIN_EMAIL: ""
-        run: pytest
+        run: pytest tests/ -v
+
+      - name: Test (testsv2 — real DB)
+        env:
+          DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test
+          COGNITO_REGION: us-east-2
+          COGNITO_USER_POOL_ID: test
+          COGNITO_APP_CLIENT_ID: test
+          BOOTSTRAP_ADMIN_EMAIL: ""
+        run: pytest testsv2/ -v
 
   # ─── Job 2: Build Docker Image + Push to ECR ─────────
   # Runs on: push to development or main (not PRs)
