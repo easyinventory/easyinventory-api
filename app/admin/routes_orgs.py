@@ -6,6 +6,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 
 from app.admin import service as admin_service
 from app.admin.schemas import (
@@ -102,19 +103,49 @@ async def list_orgs(
     db: AsyncSession = Depends(get_db),
 ) -> list[OrgListItem]:
     """List all organizations. System admin only."""
-    orgs = await admin_service.list_all_orgs(db)
+    # Compute owner_email and member_count via SQL aggregates to avoid
+    # materializing full membership and user collections for every org.
+    owner_subq = (
+        select(
+            OrgMembership.org_id,
+            User.email.label("owner_email"),
+        )
+        .join(User, User.id == OrgMembership.user_id)
+        .where(OrgMembership.org_role == OrgRole.OWNER)
+        .subquery()
+    )
+
+    stmt = (
+        select(
+            Organization.id,
+            Organization.name,
+            Organization.created_at,
+            func.count(OrgMembership.id).label("member_count"),
+            owner_subq.c.owner_email,
+        )
+        .select_from(Organization)
+        .join(OrgMembership, OrgMembership.org_id == Organization.id, isouter=True)
+        .join(owner_subq, owner_subq.c.org_id == Organization.id, isouter=True)
+        .group_by(
+            Organization.id,
+            Organization.name,
+            Organization.created_at,
+            owner_subq.c.owner_email,
+        )
+    )
+
+    result = await db.execute(stmt)
+    rows = result.all()
+
     return [
         OrgListItem(
-            id=org.id,
-            name=org.name,
-            created_at=org.created_at,
-            owner_email=next(
-                (m.user.email for m in org.memberships if m.org_role == OrgRole.OWNER),
-                None,
-            ),
-            member_count=len(org.memberships),
+            id=row.id,
+            name=row.name,
+            created_at=row.created_at,
+            owner_email=row.owner_email,
+            member_count=row.member_count,
         )
-        for org in orgs
+        for row in rows
     ]
 
 
@@ -129,15 +160,45 @@ async def rename_org(
     org = await _get_org_or_404(db, org_id)
     org = await admin_service.rename_org(db, org, body.name)
 
+    # After renaming, compute owner_email and member_count via aggregates
+    # instead of traversing org.memberships to avoid loading related collections.
+    owner_subq = (
+        select(
+            OrgMembership.org_id,
+            User.email.label("owner_email"),
+        )
+        .join(User, User.id == OrgMembership.user_id)
+        .where(
+            OrgMembership.org_role == OrgRole.OWNER,
+            OrgMembership.org_id == org.id,
+        )
+        .subquery()
+    )
+
+    stmt = (
+        select(
+            func.count(OrgMembership.id).label("member_count"),
+            owner_subq.c.owner_email,
+        )
+        .select_from(Organization)
+        .join(OrgMembership, OrgMembership.org_id == Organization.id, isouter=True)
+        .join(owner_subq, owner_subq.c.org_id == Organization.id, isouter=True)
+        .where(Organization.id == org.id)
+        .group_by(owner_subq.c.owner_email)
+    )
+
+    result = await db.execute(stmt)
+    row = result.one_or_none()
+
+    owner_email = row.owner_email if row is not None else None
+    member_count = row.member_count if row is not None else 0
+
     return OrgListItem(
         id=org.id,
         name=org.name,
         created_at=org.created_at,
-        owner_email=next(
-            (m.user.email for m in org.memberships if m.org_role == OrgRole.OWNER),
-            None,
-        ),
-        member_count=len(org.memberships),
+        owner_email=owner_email,
+        member_count=member_count,
     )
 
 
