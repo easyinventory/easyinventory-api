@@ -207,3 +207,4 @@ marimo/_lsp/
 __marimo__/
 .env.prod
 build-and-push.sh
+.env.test
