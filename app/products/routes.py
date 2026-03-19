@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.orgs.deps import get_current_org_membership, require_org_role
+from app.orgs.deps import get_current_org_membership, RequireOrgRole
 from app.core.database import get_db
 from app.models.org_membership import OrgMembership
 from app.models.product import Product
@@ -105,7 +105,7 @@ async def update_product(
 @router.delete("/{product_id}", status_code=204)
 async def delete_product(
     product_id: uuid.UUID,
-    membership: OrgMembership = Depends(require_org_role("ORG_OWNER", "ORG_ADMIN")),
+    membership: OrgMembership = Depends(RequireOrgRole("ORG_OWNER", "ORG_ADMIN")),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Delete a product. Owner/Admin only."""

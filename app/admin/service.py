@@ -7,6 +7,8 @@ These functions are only accessible to SYSTEM_ADMIN users.
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import delete, func, select
@@ -18,59 +20,36 @@ from app.models.organization import Organization
 from app.models.org_membership import OrgMembership
 from app.models.user import User
 
+# ── Data containers ──
 
-async def list_all_orgs(db: AsyncSession) -> list[dict]:
+
+@dataclass
+class UserWithOrgCount:
+    id: uuid.UUID
+    email: str
+    system_role: str
+    is_active: bool
+    created_at: datetime
+    org_count: int
+
+
+@dataclass
+class OrgWithDetails:
+    id: uuid.UUID
+    name: str
+    created_at: datetime
+    owner_email: str | None
+    member_count: int
+
+
+async def list_all_orgs(db: AsyncSession) -> list[Organization]:
     """
-    List all organizations with owner email and member count.
+    List all organizations with memberships and users loaded.
     System admin only — returns data across all orgs.
     """
-    # Subquery: count members per org
-    member_count_sq = (
-        select(
-            OrgMembership.org_id,
-            func.count(OrgMembership.id).label("member_count"),
-        )
-        .group_by(OrgMembership.org_id)
-        .subquery()
-    )
-
-    # Subquery: owner email per org
-    owner_sq = (
-        select(
-            OrgMembership.org_id,
-            User.email.label("owner_email"),
-        )
-        .join(User, OrgMembership.user_id == User.id)
-        .where(OrgMembership.org_role == OrgRole.OWNER)
-        .subquery()
-    )
-
-    stmt = (
-        select(
-            Organization.id,
-            Organization.name,
-            Organization.created_at,
-            owner_sq.c.owner_email,
-            func.coalesce(member_count_sq.c.member_count, 0).label("member_count"),
-        )
-        .outerjoin(owner_sq, Organization.id == owner_sq.c.org_id)
-        .outerjoin(member_count_sq, Organization.id == member_count_sq.c.org_id)
-        .order_by(Organization.created_at.desc())
-    )
-
+    stmt = select(Organization).order_by(Organization.created_at.desc())
     result = await db.execute(stmt)
-    rows = result.all()
-
-    return [
-        {
-            "id": row.id,
-            "name": row.name,
-            "created_at": row.created_at,
-            "owner_email": row.owner_email,
-            "member_count": row.member_count,
-        }
-        for row in rows
-    ]
+    return list(result.scalars().all())
 
 
 async def get_org_by_id(
@@ -149,41 +128,141 @@ async def transfer_ownership(
     return new_owner_membership
 
 
-async def list_all_users(db: AsyncSession) -> list[dict]:
-    """List all users with their active org count."""
-    org_count_sq = (
-        select(
-            OrgMembership.user_id,
-            func.count(OrgMembership.id).label("org_count"),
+async def list_all_users(db: AsyncSession) -> list[User]:
+    """List all users with memberships loaded."""
+    stmt = select(User).order_by(User.created_at.desc())
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
+
+
+# ── Aggregate queries ──
+
+
+async def list_users_with_org_counts(
+    db: AsyncSession,
+) -> list[UserWithOrgCount]:
+    """
+    List all users with their active-organization counts.
+
+    Performs a single aggregate query for org counts instead of
+    materializing full membership collections for every user.
+    """
+    users = await list_all_users(db)
+
+    user_ids = [user.id for user in users]
+    org_counts: dict[uuid.UUID, int] = {}
+    if user_ids:
+        stmt = (
+            select(OrgMembership.user_id, func.count(OrgMembership.id))
+            .where(
+                OrgMembership.user_id.in_(user_ids),
+                OrgMembership.is_active.is_(True),
+            )
+            .group_by(OrgMembership.user_id)
         )
-        .where(OrgMembership.is_active == True)  # noqa: E712
-        .group_by(OrgMembership.user_id)
+        result = await db.execute(stmt)
+        org_counts = {user_id: count for user_id, count in result.all()}
+
+    return [
+        UserWithOrgCount(
+            id=user.id,
+            email=user.email,
+            system_role=user.system_role,
+            is_active=user.is_active,
+            created_at=user.created_at,
+            org_count=org_counts.get(user.id, 0),
+        )
+        for user in users
+    ]
+
+
+async def list_orgs_with_details(db: AsyncSession) -> list[OrgWithDetails]:
+    """
+    List all organizations with owner email and member count.
+
+    Uses SQL aggregates and a subquery to compute owner_email and
+    member_count without materializing full related collections.
+    """
+    owner_subq = (
+        select(
+            OrgMembership.org_id,
+            User.email.label("owner_email"),
+        )
+        .join(User, User.id == OrgMembership.user_id)
+        .where(OrgMembership.org_role == OrgRole.OWNER)
         .subquery()
     )
 
     stmt = (
         select(
-            User.id,
-            User.email,
-            User.system_role,
-            User.is_active,
-            User.created_at,
-            func.coalesce(org_count_sq.c.org_count, 0).label("org_count"),
+            Organization.id,
+            Organization.name,
+            Organization.created_at,
+            func.count(OrgMembership.id).label("member_count"),
+            owner_subq.c.owner_email,
         )
-        .outerjoin(org_count_sq, User.id == org_count_sq.c.user_id)
-        .order_by(User.created_at.desc())
+        .select_from(Organization)
+        .join(OrgMembership, OrgMembership.org_id == Organization.id, isouter=True)
+        .join(owner_subq, owner_subq.c.org_id == Organization.id, isouter=True)
+        .group_by(
+            Organization.id,
+            Organization.name,
+            Organization.created_at,
+            owner_subq.c.owner_email,
+        )
     )
-    result = await db.execute(stmt)
-    rows = result.all()
 
+    result = await db.execute(stmt)
     return [
-        {
-            "id": row.id,
-            "email": row.email,
-            "system_role": row.system_role,
-            "is_active": row.is_active,
-            "created_at": row.created_at,
-            "org_count": row.org_count,
-        }
-        for row in rows
+        OrgWithDetails(
+            id=row.id,
+            name=row.name,
+            created_at=row.created_at,
+            owner_email=row.owner_email,
+            member_count=row.member_count,
+        )
+        for row in result.all()
     ]
+
+
+async def get_org_owner_and_member_count(
+    db: AsyncSession,
+    org_id: uuid.UUID,
+) -> tuple[str | None, int]:
+    """
+    Return ``(owner_email, member_count)`` for a single organization.
+
+    Used after mutations (e.g. rename) to build the response without
+    loading full related collections.
+    """
+    owner_subq = (
+        select(
+            OrgMembership.org_id,
+            User.email.label("owner_email"),
+        )
+        .join(User, User.id == OrgMembership.user_id)
+        .where(
+            OrgMembership.org_role == OrgRole.OWNER,
+            OrgMembership.org_id == org_id,
+        )
+        .subquery()
+    )
+
+    stmt = (
+        select(
+            func.count(OrgMembership.id).label("member_count"),
+            owner_subq.c.owner_email,
+        )
+        .select_from(Organization)
+        .join(OrgMembership, OrgMembership.org_id == Organization.id, isouter=True)
+        .join(owner_subq, owner_subq.c.org_id == Organization.id, isouter=True)
+        .where(Organization.id == org_id)
+        .group_by(owner_subq.c.owner_email)
+    )
+
+    result = await db.execute(stmt)
+    row = result.one_or_none()
+
+    owner_email = row.owner_email if row is not None else None
+    member_count = row.member_count if row is not None else 0
+    return owner_email, member_count

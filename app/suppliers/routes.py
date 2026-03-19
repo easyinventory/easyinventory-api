@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.orgs.deps import (
     get_current_org_membership,
-    require_org_role,
+    RequireOrgRole,
 )
 from app.core.database import get_db
 from app.models.org_membership import OrgMembership
@@ -97,7 +97,7 @@ async def update_supplier(
 @router.delete("/{supplier_id}", status_code=204)
 async def delete_supplier(
     supplier_id: uuid.UUID,
-    membership: OrgMembership = Depends(require_org_role("ORG_OWNER", "ORG_ADMIN")),
+    membership: OrgMembership = Depends(RequireOrgRole("ORG_OWNER", "ORG_ADMIN")),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Delete a supplier. Owner/Admin only."""
