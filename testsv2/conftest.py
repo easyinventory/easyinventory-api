@@ -21,6 +21,7 @@ from collections.abc import AsyncGenerator
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     create_async_engine,
@@ -72,15 +73,37 @@ async def db() -> AsyncGenerator[AsyncSession, None]:
 
     After the test finishes (pass or fail) the transaction is rolled back,
     so every test starts with a clean database and tests can run in any order.
+
+    This uses an outer transaction plus a nested transaction (SAVEPOINT) so
+    that ``session.commit()`` calls in application code only release the
+    savepoint while the outer transaction remains open and can be rolled
+    back at the end of the test.
     """
     async with test_engine.connect() as conn:
-        transaction = await conn.begin()
+        # Begin an outer transaction on the connection.
+        outer_transaction = await conn.begin()
+        # Create a session bound to this connection.
         session = AsyncSession(bind=conn, expire_on_commit=False)
+
+        # Start a nested transaction (SAVEPOINT) that the session will use.
+        nested = await session.begin_nested()
+
+        # When the nested transaction ends (e.g., due to session.commit()),
+        # automatically start a new SAVEPOINT as long as the outer
+        # transaction is still active.
+        @event.listens_for(session.sync_session, "after_transaction_end")
+        def _restart_savepoint(sess, transaction) -> None:
+            if transaction.nested and not transaction._parent.nested:
+                sess.begin_nested()
+
         try:
             yield session
         finally:
-            await transaction.rollback()
+            # Roll back any remaining work and close the session.
+            await session.rollback()
             await session.close()
+            # Roll back the outer transaction so the database is clean.
+            await outer_transaction.rollback()
 
 
 # ── App wired to use the test session ──
