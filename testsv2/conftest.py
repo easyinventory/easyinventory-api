@@ -34,7 +34,17 @@ from app.main import create_app
 import app.models  # noqa: F401
 
 # ── Engine shared across the entire test session ──
-test_engine = create_async_engine(settings.DATABASE_URL, echo=False)
+test_database_url = settings.DATABASE_URL
+if not test_database_url or not str(test_database_url).strip():
+    raise RuntimeError(
+        "DATABASE_URL must be set to a non-empty test database URL when running tests."
+    )
+if "test" not in str(test_database_url):
+    raise RuntimeError(
+        "Refusing to run tests against a non-test database. "
+        "Ensure DATABASE_URL points to a dedicated test database (e.g., name contains 'test')."
+    )
+test_engine = create_async_engine(test_database_url, echo=False)
 
 
 # ── Create / drop tables once per session ──
