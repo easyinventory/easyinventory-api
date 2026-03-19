@@ -5,19 +5,19 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import (
+from app.orgs.deps import (
     get_current_org_membership,
     require_org_role,
 )
 from app.core.database import get_db
 from app.models.org_membership import OrgMembership
 from app.models.supplier import Supplier
-from app.schemas.supplier import (
+from app.suppliers.schemas import (
     SupplierCreate,
     SupplierUpdate,
     SupplierResponse,
 )
-from app.services import supplier_service
+from app.suppliers import service as supplier_service
 
 router = APIRouter(prefix="/api/suppliers", tags=["suppliers"])
 

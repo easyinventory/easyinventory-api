@@ -39,10 +39,10 @@ async def test_orgs_me_returns_empty_list_for_no_memberships(app, client):
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
         with patch(
-            "app.api.deps.verify_token",
+            "app.auth.deps.verify_token",
             return_value={"sub": "abc-123", "email": "test@example.com"},
         ):
-            with patch("app.api.deps.get_or_create_user", return_value=mock_user):
+            with patch("app.auth.deps.get_or_create_user", return_value=mock_user):
                 response = await client.get(
                     "/api/orgs/me",
                     headers={"Authorization": "Bearer fake-token"},
@@ -79,10 +79,10 @@ async def test_orgs_me_returns_memberships(app, client):
     app.dependency_overrides[get_db] = lambda: mock_db
     try:
         with patch(
-            "app.api.deps.verify_token",
+            "app.auth.deps.verify_token",
             return_value={"sub": "admin-sub", "email": "admin@company.com"},
         ):
-            with patch("app.api.deps.get_or_create_user", return_value=mock_user):
+            with patch("app.auth.deps.get_or_create_user", return_value=mock_user):
                 response = await client.get(
                     "/api/orgs/me",
                     headers={"Authorization": "Bearer fake-token"},

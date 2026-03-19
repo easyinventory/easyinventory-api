@@ -8,12 +8,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from app.core.bootstrap import run_bootstrap
+from app.bootstrap.seeder import run_bootstrap
 from app.core.config import settings
 from app.core.database import async_session, engine
 from app.core.exceptions import AppError
 from app.core.middleware import JsonFormatter, RequestLoggingMiddleware
-from app.api.routes import health, auth, admin, orgs, suppliers, products
+from app.auth.routes import router as auth_router
+from app.orgs.routes import router as orgs_router
+from app.admin.routes_orgs import router as admin_orgs_router
+from app.admin.routes_users import router as admin_users_router
+from app.health.routes import router as health_router
+from app.products.routes import router as products_router
+from app.suppliers.routes import router as suppliers_router
 
 # ── Structured JSON logging to stdout → Docker → CloudWatch ──
 handler = logging.StreamHandler(sys.stdout)
@@ -68,12 +74,13 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(RequestLoggingMiddleware)
 
-    app.include_router(health.router)
-    app.include_router(auth.router)
-    app.include_router(admin.router)
-    app.include_router(orgs.router)
-    app.include_router(suppliers.router)
-    app.include_router(products.router)
+    app.include_router(health_router)
+    app.include_router(auth_router)
+    app.include_router(admin_orgs_router)
+    app.include_router(admin_users_router)
+    app.include_router(orgs_router)
+    app.include_router(suppliers_router)
+    app.include_router(products_router)
 
     return app
 

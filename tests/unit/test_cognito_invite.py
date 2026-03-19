@@ -1,11 +1,11 @@
 from unittest.mock import patch, MagicMock
 from botocore.exceptions import ClientError
 
-from app.core.cognito import invite_cognito_user
+from app.auth.cognito_admin import invite_cognito_user
 
 
-@patch("app.core.cognito.settings")
-@patch("app.core.cognito._get_cognito_client")
+@patch("app.auth.cognito_admin.settings")
+@patch("app.auth.cognito_admin._get_cognito_client")
 def test_creates_cognito_user(mock_get_client, mock_settings):
     """Should call admin_create_user with correct params."""
     mock_settings.COGNITO_REGION = "us-east-2"
@@ -31,8 +31,8 @@ def test_creates_cognito_user(mock_get_client, mock_settings):
     assert verified_attr["Value"] == "true"
 
 
-@patch("app.core.cognito.settings")
-@patch("app.core.cognito._get_cognito_client")
+@patch("app.auth.cognito_admin.settings")
+@patch("app.auth.cognito_admin._get_cognito_client")
 def test_returns_false_if_user_exists(mock_get_client, mock_settings):
     """Should resend invite email and return False if Cognito user already exists."""
     mock_settings.COGNITO_REGION = "us-east-2"
@@ -58,8 +58,8 @@ def test_returns_false_if_user_exists(mock_get_client, mock_settings):
     assert resend_kwargs["Username"] == "existing@test.com"
 
 
-@patch("app.core.cognito.settings")
-@patch("app.core.cognito._get_cognito_client")
+@patch("app.auth.cognito_admin.settings")
+@patch("app.auth.cognito_admin._get_cognito_client")
 def test_raises_on_other_errors(mock_get_client, mock_settings):
     """Should re-raise non-UsernameExistsException errors."""
     mock_settings.COGNITO_REGION = "us-east-2"

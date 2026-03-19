@@ -6,7 +6,7 @@ user and default organization exist in the database.  Uses the same
 placeholder pattern as the invite flow — the admin record is created
 with a ``pending:bootstrap`` cognito_sub and claimed automatically on
 first real login via the standard placeholder-claim logic in
-user_service.
+users.service.
 
 This replaces the old approach where bootstrap checks were scattered
 across user_service and org_service and evaluated on every new-user
@@ -16,11 +16,11 @@ login.
 from __future__ import annotations
 
 import uuid
-from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bootstrap.seed_data import SEED_PRODUCTS, SEED_SUPPLIERS
 from app.core.config import settings
 from app.core.roles import OrgRole, SystemRole
 from app.models.organization import Organization
@@ -29,77 +29,6 @@ from app.models.product import Product
 from app.models.product_supplier import ProductSupplier
 from app.models.supplier import Supplier
 from app.models.user import User
-
-# ── Seed data ──
-
-SEED_SUPPLIERS = [
-    {
-        "name": "Fresh Farms Co.",
-        "contact_name": "Maria Garcia",
-        "contact_email": "maria@freshfarms.com",
-        "contact_phone": "555-0101",
-        "notes": "Local organic produce supplier",
-    },
-    {
-        "name": "Pacific Coast Distributors",
-        "contact_name": "James Chen",
-        "contact_email": "james@pacificcoast.com",
-        "contact_phone": "555-0102",
-        "notes": "West coast distribution, 2-day delivery",
-    },
-    {
-        "name": "Valley Grains & Goods",
-        "contact_name": "Sarah Miller",
-        "contact_email": "sarah@valleygrains.com",
-        "contact_phone": "555-0103",
-        "notes": "Specialty grains and dry goods",
-    },
-    {
-        "name": "Mountain Spring Dairy",
-        "contact_name": "Tom Baker",
-        "contact_email": "tom@mountainspring.com",
-        "contact_phone": "555-0104",
-        "notes": "Dairy and refrigerated products",
-    },
-]
-
-SEED_PRODUCTS: list[dict[str, Any]] = [
-    {
-        "name": "Organic Apples",
-        "description": "Fresh organic Fuji apples",
-        "sku": "PRD-001",
-        "category": "Produce",
-        "supplier_indices": [0, 1],  # Fresh Farms + Pacific Coast
-    },
-    {
-        "name": "Whole Wheat Flour",
-        "description": "Stone-ground whole wheat flour, 25lb bag",
-        "sku": "PRD-002",
-        "category": "Dry Goods",
-        "supplier_indices": [2],  # Valley Grains
-    },
-    {
-        "name": "Organic Oranges",
-        "description": "Navel oranges, premium grade",
-        "sku": "PRD-003",
-        "category": "Produce",
-        "supplier_indices": [0, 1],  # Fresh Farms + Pacific Coast
-    },
-    {
-        "name": "Whole Milk",
-        "description": "Fresh whole milk, 1 gallon",
-        "sku": "PRD-004",
-        "category": "Dairy",
-        "supplier_indices": [3],  # Mountain Spring
-    },
-    {
-        "name": "Brown Rice",
-        "description": "Long grain brown rice, 50lb bag",
-        "sku": "PRD-005",
-        "category": "Dry Goods",
-        "supplier_indices": [2, 1],  # Valley Grains + Pacific Coast
-    },
-]
 
 
 async def run_bootstrap(db: AsyncSession) -> None:
@@ -159,7 +88,7 @@ async def run_bootstrap(db: AsyncSession) -> None:
     # ── User exists — check for org membership ──
     mem_stmt = select(OrgMembership).where(OrgMembership.user_id == existing_user.id)
     mem_result = await db.execute(mem_stmt)
-    existing_membership = mem_result.scalar_one_or_none()
+    existing_membership = mem_result.scalars().first()
 
     if existing_membership is not None:
         print(f"[bootstrap] Admin user '{email}' already exists")

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from jose import jwt
 
-from app.core.cognito import verify_token, get_signing_key
+from app.auth.cognito_token import verify_token, get_signing_key
 
 # ── Test constants ──
 TEST_REGION = "us-east-1"
@@ -78,8 +78,8 @@ def _mock_jwks():
 # ── Tests ──
 
 
-@patch("app.core.cognito.settings", new_callable=_mock_settings)
-@patch("app.core.cognito.get_jwks", return_value=_mock_jwks())
+@patch("app.auth.cognito_token.settings", new_callable=_mock_settings)
+@patch("app.auth.cognito_token.get_jwks", return_value=_mock_jwks())
 def test_verify_valid_token(mock_jwks, mock_settings):
     token = _make_token()
     claims = verify_token(token)
@@ -87,8 +87,8 @@ def test_verify_valid_token(mock_jwks, mock_settings):
     assert claims["email"] == "test@example.com"
 
 
-@patch("app.core.cognito.settings", new_callable=_mock_settings)
-@patch("app.core.cognito.get_jwks", return_value=_mock_jwks())
+@patch("app.auth.cognito_token.settings", new_callable=_mock_settings)
+@patch("app.auth.cognito_token.get_jwks", return_value=_mock_jwks())
 def test_verify_token_returns_all_claims(mock_jwks, mock_settings):
     token = _make_token(sub="user-456", email="admin@test.com")
     claims = verify_token(token)
@@ -100,8 +100,8 @@ def test_verify_token_returns_all_claims(mock_jwks, mock_settings):
     assert "iat" in claims
 
 
-@patch("app.core.cognito.settings", new_callable=_mock_settings)
-@patch("app.core.cognito.get_jwks", return_value=_mock_jwks())
+@patch("app.auth.cognito_token.settings", new_callable=_mock_settings)
+@patch("app.auth.cognito_token.get_jwks", return_value=_mock_jwks())
 def test_expired_token_raises(mock_jwks, mock_settings):
     token = _make_token(exp_minutes=-10)
     try:
@@ -111,8 +111,8 @@ def test_expired_token_raises(mock_jwks, mock_settings):
         assert "expired" in str(e).lower() or "Signature has expired" in str(e)
 
 
-@patch("app.core.cognito.settings", new_callable=_mock_settings)
-@patch("app.core.cognito.get_jwks", return_value=_mock_jwks())
+@patch("app.auth.cognito_token.settings", new_callable=_mock_settings)
+@patch("app.auth.cognito_token.get_jwks", return_value=_mock_jwks())
 def test_wrong_audience_raises(mock_jwks, mock_settings):
     token = _make_token(audience="wrong-client-id")
     try:
@@ -122,8 +122,8 @@ def test_wrong_audience_raises(mock_jwks, mock_settings):
         pass  # Any exception is acceptable
 
 
-@patch("app.core.cognito.settings", new_callable=_mock_settings)
-@patch("app.core.cognito.get_jwks", return_value=_mock_jwks())
+@patch("app.auth.cognito_token.settings", new_callable=_mock_settings)
+@patch("app.auth.cognito_token.get_jwks", return_value=_mock_jwks())
 def test_wrong_issuer_raises(mock_jwks, mock_settings):
     token = _make_token(issuer="https://wrong-issuer.com")
     try:
@@ -133,8 +133,8 @@ def test_wrong_issuer_raises(mock_jwks, mock_settings):
         pass  # Any exception is acceptable
 
 
-@patch("app.core.cognito.settings", new_callable=_mock_settings)
-@patch("app.core.cognito.get_jwks", return_value={"keys": []})
+@patch("app.auth.cognito_token.settings", new_callable=_mock_settings)
+@patch("app.auth.cognito_token.get_jwks", return_value={"keys": []})
 def test_unknown_kid_raises(mock_jwks, mock_settings):
     token = _make_token(kid="unknown-kid")
     try:

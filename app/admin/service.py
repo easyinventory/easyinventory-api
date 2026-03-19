@@ -1,3 +1,9 @@
+"""
+System admin service — org management and user management operations.
+
+These functions are only accessible to SYSTEM_ADMIN users.
+"""
+
 from __future__ import annotations
 
 import uuid
@@ -7,153 +13,10 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import InvalidRole, NotFound
-from app.core.roles import OrgRole, SystemRole
+from app.core.roles import OrgRole
 from app.models.organization import Organization
 from app.models.org_membership import OrgMembership
 from app.models.user import User
-
-# ── New: member management ──
-
-
-async def list_org_members(
-    db: AsyncSession,
-    org_id: uuid.UUID,
-) -> list[dict]:
-    """List all members of an org with their user email."""
-    stmt = (
-        select(OrgMembership, User.email)
-        .join(User, OrgMembership.user_id == User.id)
-        .where(OrgMembership.org_id == org_id)
-        .order_by(OrgMembership.joined_at)
-    )
-    result = await db.execute(stmt)
-    return [
-        {
-            "id": m.id,
-            "user_id": m.user_id,
-            "email": email,
-            "org_role": m.org_role,
-            "is_active": m.is_active,
-            "joined_at": m.joined_at,
-        }
-        for m, email in result.all()
-    ]
-
-
-async def get_membership_by_id(
-    db: AsyncSession,
-    membership_id: uuid.UUID,
-    org_id: uuid.UUID,
-) -> Optional[OrgMembership]:
-    """Fetch a single membership by ID within an org."""
-    stmt = (
-        select(OrgMembership)
-        .where(OrgMembership.id == membership_id)
-        .where(OrgMembership.org_id == org_id)
-    )
-    result = await db.execute(stmt)
-    return result.scalar_one_or_none()
-
-
-async def find_user_by_email(
-    db: AsyncSession,
-    email: str,
-) -> Optional[User]:
-    """Find a user by email. Returns None if not found."""
-    stmt = select(User).where(User.email == email)
-    result = await db.execute(stmt)
-    return result.scalar_one_or_none()
-
-
-async def find_existing_membership(
-    db: AsyncSession,
-    org_id: uuid.UUID,
-    user_id: uuid.UUID,
-) -> Optional[OrgMembership]:
-    """Check if a user already has a membership in this org (active or not)."""
-    stmt = (
-        select(OrgMembership)
-        .where(OrgMembership.org_id == org_id)
-        .where(OrgMembership.user_id == user_id)
-    )
-    result = await db.execute(stmt)
-    return result.scalar_one_or_none()
-
-
-async def create_membership(
-    db: AsyncSession,
-    org_id: uuid.UUID,
-    user_id: uuid.UUID,
-    org_role: str,
-    is_active: bool = True,
-) -> OrgMembership:
-    """Create a new org membership."""
-    membership = OrgMembership(
-        org_id=org_id,
-        user_id=user_id,
-        org_role=org_role,
-        is_active=is_active,
-    )
-    db.add(membership)
-    await db.flush()
-    return membership
-
-
-async def create_placeholder_user(
-    db: AsyncSession,
-    email: str,
-) -> User:
-    """Create a placeholder for an invited email that hasn't signed up."""
-    user = User(
-        cognito_sub=f"pending:{email}",
-        email=email,
-        system_role=SystemRole.USER,
-        is_active=False,
-    )
-    db.add(user)
-    await db.flush()
-    return user
-
-
-async def update_role(
-    db: AsyncSession,
-    membership: OrgMembership,
-    new_role: str,
-) -> OrgMembership:
-    """Update a membership's role."""
-    membership.org_role = new_role
-    await db.flush()
-    return membership
-
-
-async def set_active_status(
-    db: AsyncSession,
-    membership: OrgMembership,
-    is_active: bool,
-) -> OrgMembership:
-    """Set a membership's active status."""
-    membership.is_active = is_active
-    await db.flush()
-    return membership
-
-
-async def delete_membership(
-    db: AsyncSession,
-    membership: OrgMembership,
-) -> None:
-    """Permanently delete a membership."""
-    await db.delete(membership)
-    await db.flush()
-
-
-async def get_user_by_id(
-    db: AsyncSession,
-    user_id: uuid.UUID,
-) -> Optional[User]:
-    """Fetch a user by ID."""
-    stmt = select(User).where(User.id == user_id)
-    result = await db.execute(stmt)
-    return result.scalar_one_or_none()
 
 
 async def list_all_orgs(db: AsyncSession) -> list[dict]:
@@ -210,9 +73,6 @@ async def list_all_orgs(db: AsyncSession) -> list[dict]:
     ]
 
 
-# ── Org management (System Admin) ──
-
-
 async def get_org_by_id(
     db: AsyncSession,
     org_id: uuid.UUID,
@@ -255,6 +115,9 @@ async def transfer_ownership(
     The new owner must already be a member of the org.
     The current owner is demoted to admin.
     """
+    from app.users.service import find_user_by_email
+    from app.orgs.service import find_existing_membership
+
     # Find new owner's user record
     new_owner = await find_user_by_email(db, new_owner_email)
     if not new_owner:
@@ -284,9 +147,6 @@ async def transfer_ownership(
     new_owner_membership.org_role = OrgRole.OWNER
     await db.flush()
     return new_owner_membership
-
-
-# ── User management (System Admin) ──
 
 
 async def list_all_users(db: AsyncSession) -> list[dict]:

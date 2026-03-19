@@ -46,10 +46,10 @@ async def test_me_returns_www_authenticate_header(client):
 async def test_me_returns_200_with_valid_token(client):
     mock_user = _mock_user()
     with patch(
-        "app.api.deps.verify_token",
+        "app.auth.deps.verify_token",
         return_value={"sub": "abc-123", "email": "test@example.com"},
     ):
-        with patch("app.api.deps.get_or_create_user", return_value=mock_user):
+        with patch("app.auth.deps.get_or_create_user", return_value=mock_user):
             response = await client.get(
                 "/api/me",
                 headers={"Authorization": "Bearer fake-but-mocked-token"},
@@ -66,10 +66,10 @@ async def test_me_returns_user_fields(client):
         system_role="SYSTEM_ADMIN",
     )
     with patch(
-        "app.api.deps.verify_token",
+        "app.auth.deps.verify_token",
         return_value={"sub": "xyz-789", "email": "admin@company.com"},
     ):
-        with patch("app.api.deps.get_or_create_user", return_value=mock_user):
+        with patch("app.auth.deps.get_or_create_user", return_value=mock_user):
             response = await client.get(
                 "/api/me",
                 headers={"Authorization": "Bearer fake-token"},

@@ -7,12 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 
-from app.api.deps import (
-    get_current_user,
+from app.auth.deps import get_current_user
+from app.orgs.deps import (
     get_current_org_membership,
     require_org_role,
 )
-from app.api.permissions import (
+from app.orgs.permissions import (
     assert_admin_hierarchy,
     assert_can_assign_role,
     assert_not_owner,
@@ -22,14 +22,15 @@ from app.core.database import get_db
 from app.core.roles import OrgRole
 from app.models.user import User
 from app.models.org_membership import OrgMembership
-from app.schemas.org import (
+from app.orgs.schemas import (
     OrgMembershipResponse,
     OrgMemberDetail,
     InviteMemberRequest,
     UpdateRoleRequest,
 )
-from app.services import org_service
-from app.services.invite_service import invite_user_to_org
+from app.orgs import service as org_service
+from app.users import service as user_service
+from app.invites.service import invite_user_to_org
 
 router = APIRouter(prefix="/api/orgs", tags=["organizations"])
 
@@ -57,7 +58,7 @@ async def _member_detail(
     email: str | None = None,
 ) -> dict:
     if not email:
-        user = await org_service.get_user_by_id(db, membership.user_id)
+        user = await user_service.get_user_by_id(db, membership.user_id)
         email = user.email if user else ""
     return {
         "id": membership.id,

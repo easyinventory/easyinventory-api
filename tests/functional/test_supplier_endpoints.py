@@ -2,7 +2,7 @@ import uuid
 from contextlib import contextmanager
 from unittest.mock import patch, MagicMock, AsyncMock
 
-from app.api.deps import get_current_org_membership
+from app.orgs.deps import get_current_org_membership
 from app.core.database import get_db
 from app.models.user import User
 from app.models.org_membership import OrgMembership
@@ -58,7 +58,7 @@ async def test_list_suppliers_returns_200(app, client):
     membership = _mock_membership()
 
     with _supplier_dependency_overrides(app, membership):
-        with patch("app.services.supplier_service.list_suppliers", return_value=[]):
+        with patch("app.suppliers.service.list_suppliers", return_value=[]):
             response = await client.get(
                 "/api/suppliers",
                 headers={"Authorization": "Bearer fake"},
@@ -72,9 +72,7 @@ async def test_create_supplier_returns_201(app, client):
     new_supplier = _mock_supplier(org_id=membership.org_id)
 
     with _supplier_dependency_overrides(app, membership):
-        with patch(
-            "app.services.supplier_service.create_supplier", return_value=new_supplier
-        ):
+        with patch("app.suppliers.service.create_supplier", return_value=new_supplier):
             response = await client.post(
                 "/api/suppliers",
                 json={"name": "Test Supplier"},
@@ -101,8 +99,8 @@ async def test_delete_works_for_owner(app, client):
     supplier = _mock_supplier(org_id=membership.org_id)
 
     with _supplier_dependency_overrides(app, membership):
-        with patch("app.services.supplier_service.get_supplier", return_value=supplier):
-            with patch("app.services.supplier_service.delete_supplier"):
+        with patch("app.suppliers.service.get_supplier", return_value=supplier):
+            with patch("app.suppliers.service.delete_supplier"):
                 response = await client.delete(
                     f"/api/suppliers/{supplier.id}",
                     headers={"Authorization": "Bearer fake"},
@@ -114,7 +112,7 @@ async def test_get_nonexistent_returns_404(app, client):
     membership = _mock_membership()
 
     with _supplier_dependency_overrides(app, membership):
-        with patch("app.services.supplier_service.get_supplier", return_value=None):
+        with patch("app.suppliers.service.get_supplier", return_value=None):
             response = await client.get(
                 f"/api/suppliers/{uuid.uuid4()}",
                 headers={"Authorization": "Bearer fake"},

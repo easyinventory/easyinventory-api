@@ -53,9 +53,9 @@ async def test_non_admin_cannot_create_org(client):
     user = _mock_regular_user()
 
     with patch(
-        "app.api.deps.verify_token", return_value={"sub": "abc", "email": user.email}
+        "app.auth.deps.verify_token", return_value={"sub": "abc", "email": user.email}
     ):
-        with patch("app.api.deps.get_or_create_user", return_value=user):
+        with patch("app.auth.deps.get_or_create_user", return_value=user):
             response = await client.post(
                 "/api/admin/orgs",
                 json={"name": "New Org", "owner_email": "owner@test.com"},
@@ -78,23 +78,23 @@ async def test_admin_can_create_org_with_new_email(app, client):
 
     with _db_override(app, mock_db):
         with patch(
-            "app.api.deps.verify_token",
+            "app.auth.deps.verify_token",
             return_value={"sub": "abc", "email": admin.email},
         ):
-            with patch("app.api.deps.get_or_create_user", return_value=admin):
+            with patch("app.auth.deps.get_or_create_user", return_value=admin):
                 with patch(
-                    "app.services.invite_service.org_service.find_user_by_email",
+                    "app.invites.service.user_service.find_user_by_email",
                     return_value=None,
                 ):
                     with patch(
-                        "app.services.invite_service.invite_cognito_user"
+                        "app.invites.service.invite_cognito_user"
                     ) as mock_cognito:
                         with patch(
-                            "app.services.org_service.create_placeholder_user",
+                            "app.users.service.create_placeholder_user",
                             return_value=mock_placeholder,
                         ):
                             with patch(
-                                "app.services.org_service.create_membership",
+                                "app.orgs.service.create_membership",
                                 return_value=mock_membership,
                             ):
                                 response = await client.post(
@@ -121,22 +121,22 @@ async def test_admin_can_create_org_with_existing_user(app, client):
 
     with _db_override(app, mock_db):
         with patch(
-            "app.api.deps.verify_token",
+            "app.auth.deps.verify_token",
             return_value={"sub": "abc", "email": admin.email},
         ):
-            with patch("app.api.deps.get_or_create_user", return_value=admin):
+            with patch("app.auth.deps.get_or_create_user", return_value=admin):
                 with patch(
-                    "app.services.org_service.find_user_by_email",
+                    "app.users.service.find_user_by_email",
                     return_value=existing_user,
                 ):
                     with patch(
-                        "app.services.org_service.find_existing_membership",
+                        "app.orgs.service.find_existing_membership",
                         return_value=None,
                     ):
                         with patch(
-                            "app.services.invite_service.invite_cognito_user"
+                            "app.invites.service.invite_cognito_user"
                         ) as mock_cognito:
-                            with patch("app.services.org_service.create_membership"):
+                            with patch("app.orgs.service.create_membership"):
                                 response = await client.post(
                                     "/api/admin/orgs",
                                     json={
@@ -162,9 +162,9 @@ async def test_create_org_returns_401_without_token(client):
 async def test_list_orgs_returns_403_for_non_admin(client):
     user = _mock_regular_user()
     with patch(
-        "app.api.deps.verify_token", return_value={"sub": "abc", "email": user.email}
+        "app.auth.deps.verify_token", return_value={"sub": "abc", "email": user.email}
     ):
-        with patch("app.api.deps.get_or_create_user", return_value=user):
+        with patch("app.auth.deps.get_or_create_user", return_value=user):
             response = await client.get(
                 "/api/admin/orgs",
                 headers={"Authorization": "Bearer fake"},
@@ -180,19 +180,17 @@ async def test_admin_can_delete_user_system_and_cognito(client):
     target.cognito_sub = "sub-delete-me"
 
     with patch(
-        "app.api.deps.verify_token",
+        "app.auth.deps.verify_token",
         return_value={"sub": "abc", "email": admin.email},
     ):
-        with patch("app.api.deps.get_or_create_user", return_value=admin):
-            with patch(
-                "app.api.routes.admin.org_service.get_user_by_id", return_value=target
-            ):
+        with patch("app.auth.deps.get_or_create_user", return_value=admin):
+            with patch("app.users.service.get_user_by_id", return_value=target):
                 with patch(
-                    "app.api.routes.admin.delete_user_completely",
+                    "app.admin.routes_users.user_service.delete_user_completely",
                     new_callable=AsyncMock,
                 ) as mock_delete_db:
                     with patch(
-                        "app.api.routes.admin.delete_cognito_user"
+                        "app.admin.routes_users.delete_cognito_user"
                     ) as mock_delete_cognito:
                         response = await client.delete(
                             f"/api/admin/users/{target.id}",
@@ -209,13 +207,11 @@ async def test_admin_delete_user_returns_404_for_missing_user(client):
     missing_id = uuid.uuid4()
 
     with patch(
-        "app.api.deps.verify_token",
+        "app.auth.deps.verify_token",
         return_value={"sub": "abc", "email": admin.email},
     ):
-        with patch("app.api.deps.get_or_create_user", return_value=admin):
-            with patch(
-                "app.api.routes.admin.org_service.get_user_by_id", return_value=None
-            ):
+        with patch("app.auth.deps.get_or_create_user", return_value=admin):
+            with patch("app.users.service.get_user_by_id", return_value=None):
                 response = await client.delete(
                     f"/api/admin/users/{missing_id}",
                     headers={"Authorization": "Bearer fake"},
@@ -228,13 +224,11 @@ async def test_admin_cannot_delete_own_account(client):
     admin = _mock_admin()
 
     with patch(
-        "app.api.deps.verify_token",
+        "app.auth.deps.verify_token",
         return_value={"sub": "abc", "email": admin.email},
     ):
-        with patch("app.api.deps.get_or_create_user", return_value=admin):
-            with patch(
-                "app.api.routes.admin.org_service.get_user_by_id", return_value=admin
-            ):
+        with patch("app.auth.deps.get_or_create_user", return_value=admin):
+            with patch("app.users.service.get_user_by_id", return_value=admin):
                 response = await client.delete(
                     f"/api/admin/users/{admin.id}",
                     headers={"Authorization": "Bearer fake"},

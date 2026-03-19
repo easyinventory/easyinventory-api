@@ -1,9 +1,9 @@
-"""Tests for app.core.bootstrap — startup seeder."""
+"""Tests for app.bootstrap.seeder — startup seeder."""
 
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.core.bootstrap import run_bootstrap
+from app.bootstrap.seeder import run_bootstrap
 from app.core.roles import OrgRole, SystemRole
 from app.models.organization import Organization
 from app.models.org_membership import OrgMembership
@@ -44,11 +44,13 @@ def _mock_db_existing_user(email="admin@company.com", has_membership=True):
     user_result.scalar_one_or_none.return_value = existing
 
     membership_result = MagicMock()
+    scalars_mock = MagicMock()
+    membership_result.scalars.return_value = scalars_mock
     if has_membership:
         mock_mem = MagicMock(spec=OrgMembership)
-        membership_result.scalar_one_or_none.return_value = mock_mem
+        scalars_mock.first.return_value = mock_mem
     else:
-        membership_result.scalar_one_or_none.return_value = None
+        scalars_mock.first.return_value = None
 
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
@@ -63,7 +65,7 @@ def _mock_db_existing_user(email="admin@company.com", has_membership=True):
     return mock_db
 
 
-@patch("app.core.bootstrap.settings")
+@patch("app.bootstrap.seeder.settings")
 async def test_creates_placeholder_admin(mock_settings):
     """Bootstrap should create a placeholder user with SYSTEM_ADMIN role."""
     mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
@@ -83,7 +85,7 @@ async def test_creates_placeholder_admin(mock_settings):
     assert user.is_active is False
 
 
-@patch("app.core.bootstrap.settings")
+@patch("app.bootstrap.seeder.settings")
 async def test_creates_default_org(mock_settings):
     """Bootstrap should create an organization with the configured name."""
     mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
@@ -97,7 +99,7 @@ async def test_creates_default_org(mock_settings):
     assert org.name == "My Company"
 
 
-@patch("app.core.bootstrap.settings")
+@patch("app.bootstrap.seeder.settings")
 async def test_creates_owner_membership(mock_settings):
     """Bootstrap should create an ORG_OWNER membership linking user to org."""
     mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
@@ -112,7 +114,7 @@ async def test_creates_owner_membership(mock_settings):
     assert membership.is_active is False
 
 
-@patch("app.core.bootstrap.settings")
+@patch("app.bootstrap.seeder.settings")
 async def test_membership_inactive_until_login(mock_settings):
     """Membership should be inactive — activated when admin claims placeholder."""
     mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
@@ -127,7 +129,7 @@ async def test_membership_inactive_until_login(mock_settings):
     assert membership.is_active is False
 
 
-@patch("app.core.bootstrap.settings")
+@patch("app.bootstrap.seeder.settings")
 async def test_skips_when_user_already_exists_with_membership(mock_settings):
     """If user with that email exists AND has a membership, bootstrap skips creation but still checks seed."""
     mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
@@ -140,7 +142,7 @@ async def test_skips_when_user_already_exists_with_membership(mock_settings):
     mock_db.add.assert_not_called()
 
 
-@patch("app.core.bootstrap.settings")
+@patch("app.bootstrap.seeder.settings")
 async def test_creates_org_when_user_exists_without_membership(mock_settings):
     """If user exists but has no membership, create org + membership."""
     mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
@@ -162,7 +164,7 @@ async def test_creates_org_when_user_exists_without_membership(mock_settings):
     assert membership.is_active is True
 
 
-@patch("app.core.bootstrap.settings")
+@patch("app.bootstrap.seeder.settings")
 async def test_promotes_existing_user_to_admin(mock_settings):
     """If user exists without membership and isn't admin, promote them."""
     mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
@@ -178,7 +180,9 @@ async def test_promotes_existing_user_to_admin(mock_settings):
     user_result.scalar_one_or_none.return_value = existing
 
     membership_result = MagicMock()
-    membership_result.scalar_one_or_none.return_value = None
+    scalars_mock = MagicMock()
+    membership_result.scalars.return_value = scalars_mock
+    scalars_mock.first.return_value = None
 
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
@@ -191,7 +195,7 @@ async def test_promotes_existing_user_to_admin(mock_settings):
     assert existing.system_role == SystemRole.ADMIN
 
 
-@patch("app.core.bootstrap.settings")
+@patch("app.bootstrap.seeder.settings")
 async def test_membership_active_when_user_already_exists(mock_settings):
     """When user already exists (real login), membership should be active."""
     mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
@@ -205,7 +209,7 @@ async def test_membership_active_when_user_already_exists(mock_settings):
     assert membership.is_active is True
 
 
-@patch("app.core.bootstrap.settings")
+@patch("app.bootstrap.seeder.settings")
 async def test_skips_when_email_not_configured(mock_settings):
     """If BOOTSTRAP_ADMIN_EMAIL is empty, do nothing."""
     mock_settings.BOOTSTRAP_ADMIN_EMAIL = ""
@@ -219,7 +223,7 @@ async def test_skips_when_email_not_configured(mock_settings):
     mock_db.add.assert_not_called()
 
 
-@patch("app.core.bootstrap.settings")
+@patch("app.bootstrap.seeder.settings")
 async def test_email_is_lowercased(mock_settings):
     """Bootstrap should normalize email to lowercase."""
     mock_settings.BOOTSTRAP_ADMIN_EMAIL = "  Admin@Company.COM  "
@@ -233,7 +237,7 @@ async def test_email_is_lowercased(mock_settings):
     assert user.cognito_sub == "pending:admin@company.com"
 
 
-@patch("app.core.bootstrap.settings")
+@patch("app.bootstrap.seeder.settings")
 async def test_default_org_name_fallback(mock_settings):
     """If BOOTSTRAP_ORG_NAME is empty, fall back to 'Default Organization'."""
     mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
@@ -246,7 +250,7 @@ async def test_default_org_name_fallback(mock_settings):
     assert org.name == "Default Organization"
 
 
-@patch("app.core.bootstrap.settings")
+@patch("app.bootstrap.seeder.settings")
 async def test_flushes_for_user_org_membership_and_seeds(mock_settings):
     """Bootstrap flushes for user, org, membership, plus seed data."""
     mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
@@ -261,7 +265,7 @@ async def test_flushes_for_user_org_membership_and_seeds(mock_settings):
     assert mock_db.flush.call_count > 3
 
 
-@patch("app.core.bootstrap.settings")
+@patch("app.bootstrap.seeder.settings")
 async def test_seeds_suppliers_and_products(mock_settings):
     """Bootstrap should seed suppliers, products, and product-supplier links."""
     mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
@@ -286,7 +290,7 @@ async def test_seeds_suppliers_and_products(mock_settings):
     assert all(link.is_active is True for link in links)
 
 
-@patch("app.core.bootstrap.settings")
+@patch("app.bootstrap.seeder.settings")
 async def test_seed_skips_when_suppliers_exist(mock_settings):
     """If suppliers already exist for the org, seeding is a no-op."""
     mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
