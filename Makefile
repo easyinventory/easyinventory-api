@@ -46,7 +46,7 @@ TEST_DB_URL = postgresql+asyncpg://test:test@localhost:5433/easyinventory_test
 
 test-v2:
 	DATABASE_URL=$(TEST_DB_URL) $(PYTHON) -m alembic upgrade head
-	DATABASE_URL=$(TEST_DB_URL) $(PYTHON) -m pytest testsv2/ -v
+	DATABASE_URL=$(TEST_DB_URL) ALLOW_TEST_DB_DROP=1 $(PYTHON) -m pytest testsv2/ -v
 
 lint: format-check typecheck
 

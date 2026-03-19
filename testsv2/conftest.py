@@ -16,12 +16,14 @@ A session-scoped ``Base.metadata.create_all`` call is used as a safety net on
 top of Alembic migrations.
 """
 
+import os
 from collections.abc import AsyncGenerator
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     create_async_engine,
@@ -40,11 +42,20 @@ if not test_database_url or not str(test_database_url).strip():
     raise RuntimeError(
         "DATABASE_URL must be set to a non-empty test database URL when running tests."
     )
-if "test" not in str(test_database_url):
+_parsed_url = make_url(str(test_database_url))
+_db_name = (_parsed_url.database or "").lower()
+if "test" not in _db_name:
     raise RuntimeError(
         "Refusing to run tests against a non-test database. "
+        f"Database name '{_parsed_url.database}' must contain 'test'. "
         "Ensure DATABASE_URL points to a dedicated test database (e.g., name contains 'test')."
     )
+
+# Explicit opt-in required to allow drop_all at the end of the test session.
+# Set ALLOW_TEST_DB_DROP=1 (or "true"/"yes") in the environment.
+# The Makefile test-v2 target sets this automatically.
+_allow_drop = os.environ.get("ALLOW_TEST_DB_DROP", "").strip() in ("1", "true", "yes")
+
 test_engine = create_async_engine(test_database_url, echo=False)
 
 
@@ -60,8 +71,9 @@ async def setup_database():
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+    if _allow_drop:
+        async with test_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
     await test_engine.dispose()
 
 
