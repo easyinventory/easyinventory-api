@@ -25,7 +25,6 @@ from testsv2.factories import (
     create_user,
 )
 
-
 # ── Basic factory round-trips ──────────────────────────
 
 
@@ -108,20 +107,16 @@ async def test_create_product_supplier_link(db: AsyncSession):
 async def test_rollback_isolation_a(db: AsyncSession):
     """Create a user with a unique email. Test B must NOT see it."""
     await create_user(db, email="only-in-a@example.com")
-    result = await db.execute(
-        select(User).where(User.email == "only-in-a@example.com")
-    )
+    result = await db.execute(select(User).where(User.email == "only-in-a@example.com"))
     assert result.scalar_one_or_none() is not None
 
 
 async def test_rollback_isolation_b(db: AsyncSession):
     """This runs after test A — the user created there should be gone."""
-    result = await db.execute(
-        select(User).where(User.email == "only-in-a@example.com")
-    )
-    assert result.scalar_one_or_none() is None, (
-        "Transaction rollback failed: test A's data leaked into test B"
-    )
+    result = await db.execute(select(User).where(User.email == "only-in-a@example.com"))
+    assert (
+        result.scalar_one_or_none() is None
+    ), "Transaction rollback failed: test A's data leaked into test B"
 
 
 # ── Query exercises ────────────────────────────────────
@@ -131,9 +126,7 @@ async def test_query_users_by_email(db: AsyncSession):
     await create_user(db, email="findme@example.com")
     await create_user(db, email="other@example.com", cognito_sub=str(uuid.uuid4()))
 
-    result = await db.execute(
-        select(User).where(User.email == "findme@example.com")
-    )
+    result = await db.execute(select(User).where(User.email == "findme@example.com"))
     users = result.scalars().all()
     assert len(users) == 1
     assert users[0].email == "findme@example.com"
