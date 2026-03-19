@@ -34,3 +34,9 @@ def bypass_auth(app, test_user: User):
         return test_user
 
     app.dependency_overrides[get_current_user] = _override
+    try:
+        # Tests that depend on this fixture run with the override in place.
+        yield
+    finally:
+        # Ensure the override is removed after each test to avoid leakage.
+        app.dependency_overrides.pop(get_current_user, None)
