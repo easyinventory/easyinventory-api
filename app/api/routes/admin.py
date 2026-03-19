@@ -3,8 +3,8 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import require_role
-from app.core.cognito import delete_cognito_user
+from app.auth.cognito_admin import delete_cognito_user
+from app.auth.deps import require_role
 from app.core.database import get_db
 from app.core.roles import OrgRole, SystemRole
 from app.models.organization import Organization

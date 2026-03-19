@@ -12,7 +12,7 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.cognito import invite_cognito_user
+from app.auth.cognito_admin import invite_cognito_user
 from app.core.exceptions import AlreadyExists
 from app.models.org_membership import OrgMembership
 from app.services import org_service
