@@ -333,6 +333,36 @@ async def record_sale(
     return movement
 
 
+async def list_movements(
+    db: AsyncSession,
+    inventory_id: uuid.UUID,
+    store_id: uuid.UUID,
+) -> list[InventoryMovement]:
+    """
+    Return all movement records for an inventory entry, newest first.
+
+    Raises :class:`NotFound` if the inventory entry does not belong to the
+    given store.
+    """
+    inv_result = await db.execute(
+        select(StoreInventory).where(
+            and_(
+                StoreInventory.id == inventory_id,
+                StoreInventory.store_id == store_id,
+            )
+        )
+    )
+    if inv_result.scalar_one_or_none() is None:
+        raise NotFound(f"Inventory entry {inventory_id} not found in store {store_id}")
+
+    result = await db.execute(
+        select(InventoryMovement)
+        .where(InventoryMovement.store_inventory_id == inventory_id)
+        .order_by(InventoryMovement.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
 # ── Inventory placements ──────────────────────────────────────────────────────
 
 
