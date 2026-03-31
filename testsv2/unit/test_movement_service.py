@@ -19,7 +19,6 @@ from testsv2.factories import (
     create_user,
 )
 
-
 # ── record_receipt ────────────────────────────────────────────────────────────
 
 
@@ -28,7 +27,9 @@ async def test_record_receipt_creates_movement(db: AsyncSession) -> None:
     org = await create_org(db)
     store = await create_store(db, org_id=org.id)
     product = await create_product(db, org_id=org.id)
-    inventory = await create_store_inventory(db, store_id=store.id, product_id=product.id)
+    inventory = await create_store_inventory(
+        db, store_id=store.id, product_id=product.id
+    )
     user = await create_user(db)
 
     data = RecordReceiptRequest(quantity=10, unit_cost=Decimal("5.00"))
