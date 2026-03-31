@@ -106,7 +106,9 @@ easyinventory-api/
 │       ├── product_supplier.py  #   ProductSupplier join table (is_active flag)
 │       ├── store.py             #   Store (org-scoped, is_active, updated_at)
 │       ├── layout_version.py    #   LayoutVersion (store-scoped, version_number, rows, cols, is_active)
-│       └── zone.py              #   Zone (layout-version-scoped, name, color, cells JSON)
+│       ├── store_inventory.py   #   StoreInventory (store + product link, quantity, unit_price, low-stock threshold)
+│       ├── zone.py              #   Zone (layout-version-scoped, name, color, cells JSON)
+│       └── fixture.py           #   Fixture (layout-version-scoped, product reference, type, cell position)
 │
 ├── alembic/                     # Database migration infrastructure
 │   ├── env.py                   #   Async migration runner (reads DATABASE_URL)
@@ -456,12 +458,21 @@ All ORM models inherit from `BaseModel` (defined in `app/models/base.py`), which
                       │               │               │       │
                 ┌─────▼────┐   ┌──────▼─────┐   ┌────▼─────┐  │
                 │ Supplier │   │  Product   │   │  Store   │  │
-                └─────┬────┘   └──────┬─────┘   └──────────┘  │
-                      │               │                        │
-                      └──────┐ ┌──────┘                        │
-                      ┌──────▼─▼──────┐                        │
-                      │ProductSupplier│                        │
-                      └───────────────┘                        │
+                └─────┬────┘   └──────┬──┬──┘   └────┬──┬──┘  │
+                      │               │  │            │  │     │
+                      └──────┐ ┌──────┘  └────┐  ┌───┘  │     │
+                      ┌──────▼─▼──────┐   ┌───▼──▼────────┐   │
+                      │ProductSupplier│   │StoreInventory │   │
+                      └───────────────┘   └───────────────┘   │
+                                                               │
+                                               ┌───────────────┘
+                                          ┌────▼──────────┐
+                                          │LayoutVersion  │
+                                          └────┬──────────┘
+                                               │
+                                          ┌────▼────┐
+                                          │  Zone   │
+                                          └─────────┘
 ```
 
 | Model | Table | Key Fields | Relations |
@@ -470,9 +481,10 @@ All ORM models inherit from `BaseModel` (defined in `app/models/base.py`), which
 | `Organization` | `organizations` | `name` | → `OrgMembership` (one-to-many), `Store` (one-to-many) |
 | `OrgMembership` | `org_memberships` | `org_id` (FK), `user_id` (FK), `org_role`, `is_active` | → `User`, `Organization` |
 | `Supplier` | `suppliers` | `org_id` (FK), `name`, `contact_name`, `contact_email`, `contact_phone`, `notes` | — |
-| `Product` | `products` | `org_id` (FK), `name`, `description`, `sku`, `category` | → `ProductSupplier` (one-to-many) |
+| `Product` | `products` | `org_id` (FK), `name`, `description`, `sku`, `category` | → `ProductSupplier` (one-to-many), → `StoreInventory` (one-to-many) |
 | `ProductSupplier` | `product_suppliers` | `product_id` (FK), `supplier_id` (FK), `is_active` | → `Supplier` / Unique on `(product_id, supplier_id)` |
-| `Store` | `stores` | `org_id` (FK, CASCADE), `name`, `is_active`, `updated_at` | → `LayoutVersion` (one-to-many) |
+| `Store` | `stores` | `org_id` (FK, CASCADE), `name`, `is_active`, `updated_at` | → `LayoutVersion` (one-to-many), → `StoreInventory` (one-to-many) |
+| `StoreInventory` | `store_inventory` | `store_id` (FK, CASCADE), `product_id` (FK, CASCADE), `quantity`, `unit_price`, `low_stock_threshold`, `updated_at` | → `Store`, → `Product`; unique on `(store_id, product_id)` |
 | `LayoutVersion` | `layout_versions` | `store_id` (FK, CASCADE), `version_number`, `rows`, `cols`, `is_active`, `updated_at` | → `Zone` (one-to-many); unique on `(store_id, version_number)` |
 | `Zone` | `zones` | `layout_version_id` (FK, CASCADE), `name`, `color`, `cells` (JSON), `updated_at` | → `LayoutVersion` |
 
@@ -486,6 +498,9 @@ All ORM models inherit from `BaseModel` (defined in `app/models/base.py`), which
 - **Cascade deletes** — `Store.org_id` is defined with `ondelete="CASCADE"`, so all stores are deleted automatically when their parent organization is deleted.
 - **Layout versioning** — `LayoutVersion` models a point-in-time grid configuration for a store. Versions are immutable once created (grid dimensions cannot be changed), and only one may be `is_active=True` at a time. The `activate` endpoint uses a bulk `UPDATE … SET is_active=False` across the store, then a targeted `UPDATE … SET is_active=True` on the target, making activation atomic within the transaction.
 - **Zone cell storage** — A zone's claimed cells are stored as a JSON array of `{"row": int, "col": int}` objects rather than a normalised join table. This avoids a third table for what is effectively a small, denormalised blob that is always read and written as a unit. Cell-level validation (bounds check, intra-request duplicate check, cross-zone overlap detection) happens in the service layer before the row is written.
+- **Inventory conditional join** — `list_inventory` only joins the `products` table when `search` or `category` predicates are present. For the common unfiltered case the query stays on `store_inventory` alone and a `selectinload` fetches associated product rows efficiently via a separate IN-clause query. This avoids an unnecessary join for every basic list request.
+- **Stable inventory pagination** — The inventory list is ordered by `(created_at, id)`. The secondary `id` sort key ensures deterministic OFFSET/LIMIT pagination when multiple entries share the same `created_at` timestamp (which can happen when items are inserted in the same transaction).
+- **Inventory product contract** — The `product` field on `StoreInventoryRead` is non-optional (`ProductSummary`, not `ProductSummary | None`). The `product_id` FK is `NOT NULL` and `get_entry` always uses `selectinload`, so a missing product would indicate a data integrity failure rather than an expected empty state.
 
 ---
 

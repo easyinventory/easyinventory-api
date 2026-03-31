@@ -26,6 +26,18 @@ class StoreInventoryUpdate(BaseModel):
     low_stock_threshold: float | None = Field(default=None, ge=0)
 
 
+class ProductSummary(BaseModel):
+    """Minimal product fields embedded in inventory responses."""
+
+    id: uuid.UUID
+    name: str
+    sku: str | None
+    category: str | None
+    description: str | None
+
+    model_config = {"from_attributes": True}
+
+
 class StoreInventoryRead(BaseModel):
     id: uuid.UUID
     store_id: uuid.UUID
@@ -35,5 +47,15 @@ class StoreInventoryRead(BaseModel):
     low_stock_threshold: float | None
     created_at: datetime
     updated_at: datetime
+    product: ProductSummary
 
     model_config = {"from_attributes": True}
+
+
+class PaginatedInventoryResponse(BaseModel):
+    """Paginated wrapper for inventory list responses."""
+
+    items: list[StoreInventoryRead]
+    total: int
+    page: int
+    page_size: int

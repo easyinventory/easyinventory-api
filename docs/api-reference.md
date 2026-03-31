@@ -18,6 +18,7 @@ Complete reference for every endpoint in the EasyInventory API. All routes retur
 - [Products](#products)
 - [Product–Supplier Links](#productsupplier-links)
 - [Stores](#stores)
+- [Store Inventory](#store-inventory)
 - [Layout Versions](#layout-versions)
 - [Zones](#zones)
 - [Admin: Organizations](#admin-organizations)
@@ -673,6 +674,154 @@ Creates a new store within the current organization.
 **Errors:**
 - `403` — Caller is not the org owner.
 - `422` — Missing or empty `name`.
+
+---
+
+## Store Inventory
+
+Store inventory endpoints track which products a store stocks and at what quantity. Inventory is scoped to a specific store and linked to org-scoped products. All inventory responses include embedded product metadata.
+
+All endpoints are nested under a store: `/api/stores/{store_id}/inventory`
+
+They require authentication and a valid `X-Org-Id` header, and validate that `store_id` belongs to the caller's organization.
+
+---
+
+### `GET /api/stores/{store_id}/inventory`
+
+Returns a paginated list of all inventory entries for the store. Supports full-text search and category filtering.
+
+**Auth:** Required — any org member  
+**Query Parameters**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `search` | string | — | Case-insensitive partial match on product **name** or **category** |
+| `category` | string | — | Case-insensitive partial match on product **category** only |
+| `page` | integer | `1` | 1-based page number |
+| `page_size` | integer | `20` | Items per page (min 1, max 100) |
+
+**Response** `200`
+
+```json
+{
+  "items": [
+    {
+      "id": "entry-uuid",
+      "store_id": "store-uuid",
+      "product_id": "product-uuid",
+      "quantity": 48.0,
+      "unit_price": "2.9900",
+      "low_stock_threshold": 10.0,
+      "created_at": "2026-03-31T10:00:00Z",
+      "updated_at": "2026-03-31T10:00:00Z",
+      "product": {
+        "id": "product-uuid",
+        "name": "Organic Apples",
+        "sku": "PROD-001",
+        "category": "Produce",
+        "description": "Fresh organic Gala apples"
+      }
+    }
+  ],
+  "total": 42,
+  "page": 1,
+  "page_size": 20
+}
+```
+
+> `total` reflects the count of rows matching the active filters (before pagination), not the total number of entries in the store.
+
+**Errors:**
+- `404` — Store not found in the current org.
+
+---
+
+### `POST /api/stores/{store_id}/inventory`
+
+Adds a product to the store's inventory.
+
+**Auth:** Required — any org member  
+**Request Body**
+
+```json
+{
+  "product_id": "product-uuid",
+  "quantity": 48.0,
+  "unit_price": "2.99",
+  "low_stock_threshold": 10.0
+}
+```
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `product_id` | UUID | Yes | — | ID of the product to stock (must belong to this org) |
+| `quantity` | float | No | `0.0` | Units currently in stock (≥ 0) |
+| `unit_price` | decimal string | No | `null` | Per-unit price |
+| `low_stock_threshold` | float | No | `null` | Alert threshold for low stock (≥ 0) |
+
+**Response** `201` — The created inventory entry (same shape as a list item)
+
+**Errors:**
+- `404` — Product not found in the current org (tenant isolation — prevents stocking products from other orgs).
+- `404` — Store not found in the current org.
+- `409` — Product is already stocked in this store.
+
+---
+
+### `GET /api/stores/{store_id}/inventory/{entry_id}`
+
+Returns a single inventory entry by ID.
+
+**Auth:** Required — any org member  
+**Response** `200` — Single inventory entry (same shape as a list item)
+
+**Errors:**
+- `404` — Entry not found for this store.
+- `404` — Store not found in the current org.
+
+---
+
+### `PATCH /api/stores/{store_id}/inventory/{entry_id}`
+
+Partially updates an inventory entry. Only the fields provided in the request body are changed.
+
+**Auth:** Required — any org member  
+**Request Body** — all fields optional
+
+```json
+{
+  "quantity": 100.0,
+  "unit_price": "3.49",
+  "low_stock_threshold": 20.0
+}
+```
+
+| Field | Type | Constraints | Description |
+|---|---|---|---|
+| `quantity` | float | ≥ 0 | New quantity in stock |
+| `unit_price` | decimal string or `null` | — | Updated price; send `null` to clear |
+| `low_stock_threshold` | float or `null` | ≥ 0 | Updated threshold; send `null` to clear |
+
+**Response** `200` — The updated inventory entry
+
+**Errors:**
+- `404` — Entry not found for this store.
+- `404` — Store not found in the current org.
+
+---
+
+### `DELETE /api/stores/{store_id}/inventory/{entry_id}`
+
+Removes a product from the store's inventory.
+
+**Auth:** Required — `ORG_OWNER`  
+**Response** `204` — No content
+
+**Errors:**
+- `403` — Caller is not the org owner.
+- `404` — Entry not found for this store.
+- `404` — Store not found in the current org.
 
 ---
 

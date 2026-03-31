@@ -121,7 +121,7 @@ async def test_list_inventory_empty(
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """GET returns an empty list when the store has no inventory."""
+    """GET returns a paginated envelope with an empty items list when the store has no inventory."""
     org = await create_org(db)
     await create_membership(
         db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
@@ -131,7 +131,11 @@ async def test_list_inventory_empty(
     response = await client.get(_inventory_url(store.id), headers=_org_headers(org.id))
 
     assert response.status_code == 200
-    assert response.json() == []
+    body = response.json()
+    assert body["items"] == []
+    assert body["total"] == 0
+    assert body["page"] == 1
+    assert body["page_size"] == 20
 
 
 @pytest.mark.usefixtures("bypass_auth")
@@ -140,7 +144,7 @@ async def test_list_inventory_returns_entries(
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """GET returns all inventory entries for the store."""
+    """GET returns paginated inventory entries with joined product information."""
     org = await create_org(db)
     await create_membership(
         db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
@@ -158,9 +162,15 @@ async def test_list_inventory_returns_entries(
     response = await client.get(_inventory_url(store.id), headers=_org_headers(org.id))
 
     assert response.status_code == 200
-    product_ids = {e["product_id"] for e in response.json()}
+    body = response.json()
+    assert body["total"] == 2
+    assert len(body["items"]) == 2
+    product_ids = {e["product_id"] for e in body["items"]}
     assert str(product_a.id) in product_ids
     assert str(product_b.id) in product_ids
+    # Verify joined product data is present
+    item = next(e for e in body["items"] if e["product_id"] == str(product_a.id))
+    assert item["product"]["name"] == "Alpha"
 
 
 # ── GET /api/stores/{store_id}/inventory/{entry_id} ───────────────────────────
@@ -338,3 +348,163 @@ async def test_stock_product_cross_org_product_returns_404(
     )
 
     assert response.status_code == 404
+
+
+# ── GET /api/stores/{store_id}/inventory: search & filter ─────────────────────
+
+
+@pytest.mark.usefixtures("bypass_auth")
+async def test_list_inventory_search_by_name(
+    client: AsyncClient,
+    db: AsyncSession,
+    test_user: User,
+) -> None:
+    """?search= filters results to entries whose product name matches."""
+    org = await create_org(db)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
+    store = await create_store(db, org_id=org.id)
+    widget = await create_product(db, org_id=org.id, name="Blue Widget")
+    gadget = await create_product(db, org_id=org.id, name="Red Gadget")
+    await create_store_inventory(db, store_id=store.id, product_id=widget.id)
+    await create_store_inventory(db, store_id=store.id, product_id=gadget.id)
+
+    response = await client.get(
+        _inventory_url(store.id),
+        params={"search": "widget"},
+        headers=_org_headers(org.id),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    assert body["items"][0]["product_id"] == str(widget.id)
+
+
+@pytest.mark.usefixtures("bypass_auth")
+async def test_list_inventory_search_by_category(
+    client: AsyncClient,
+    db: AsyncSession,
+    test_user: User,
+) -> None:
+    """?search= also matches against product category."""
+    org = await create_org(db)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
+    store = await create_store(db, org_id=org.id)
+    tool = await create_product(db, org_id=org.id, name="Wrench", category="Tools")
+    snack = await create_product(db, org_id=org.id, name="Chips", category="Food")
+    await create_store_inventory(db, store_id=store.id, product_id=tool.id)
+    await create_store_inventory(db, store_id=store.id, product_id=snack.id)
+
+    response = await client.get(
+        _inventory_url(store.id),
+        params={"search": "TOOLS"},
+        headers=_org_headers(org.id),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    assert body["items"][0]["product_id"] == str(tool.id)
+
+
+@pytest.mark.usefixtures("bypass_auth")
+async def test_list_inventory_category_filter(
+    client: AsyncClient,
+    db: AsyncSession,
+    test_user: User,
+) -> None:
+    """?category= filters results to entries whose product category matches."""
+    org = await create_org(db)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
+    store = await create_store(db, org_id=org.id)
+    hardware = await create_product(db, org_id=org.id, name="Bolt", category="Hardware")
+    food = await create_product(db, org_id=org.id, name="Bread", category="Food")
+    await create_store_inventory(db, store_id=store.id, product_id=hardware.id)
+    await create_store_inventory(db, store_id=store.id, product_id=food.id)
+
+    response = await client.get(
+        _inventory_url(store.id),
+        params={"category": "hardware"},
+        headers=_org_headers(org.id),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    assert body["items"][0]["product_id"] == str(hardware.id)
+
+
+# ── GET /api/stores/{store_id}/inventory: pagination ─────────────────────────
+
+
+@pytest.mark.usefixtures("bypass_auth")
+async def test_list_inventory_pagination_page_size(
+    client: AsyncClient,
+    db: AsyncSession,
+    test_user: User,
+) -> None:
+    """?page_size= limits the number of items returned, total reflects all rows."""
+    org = await create_org(db)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
+    store = await create_store(db, org_id=org.id)
+    for i in range(5):
+        p = await create_product(db, org_id=org.id, name=f"Prod {i}")
+        await create_store_inventory(db, store_id=store.id, product_id=p.id)
+
+    response = await client.get(
+        _inventory_url(store.id),
+        params={"page": 1, "page_size": 2},
+        headers=_org_headers(org.id),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 5
+    assert len(body["items"]) == 2
+    assert body["page"] == 1
+    assert body["page_size"] == 2
+
+
+@pytest.mark.usefixtures("bypass_auth")
+async def test_list_inventory_pagination_no_overlap(
+    client: AsyncClient,
+    db: AsyncSession,
+    test_user: User,
+) -> None:
+    """Page 1 and page 2 return non-overlapping items."""
+    org = await create_org(db)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
+    store = await create_store(db, org_id=org.id)
+    for i in range(4):
+        p = await create_product(db, org_id=org.id, name=f"Item {i:02d}")
+        await create_store_inventory(db, store_id=store.id, product_id=p.id)
+
+    page1 = (
+        await client.get(
+            _inventory_url(store.id),
+            params={"page": 1, "page_size": 2},
+            headers=_org_headers(org.id),
+        )
+    ).json()["items"]
+    page2 = (
+        await client.get(
+            _inventory_url(store.id),
+            params={"page": 2, "page_size": 2},
+            headers=_org_headers(org.id),
+        )
+    ).json()["items"]
+
+    page1_ids = {e["id"] for e in page1}
+    page2_ids = {e["id"] for e in page2}
+    assert page1_ids.isdisjoint(page2_ids)
+    assert len(page2) == 2
