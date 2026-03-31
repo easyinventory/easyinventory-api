@@ -289,6 +289,7 @@ The `testsv2/factories.py` module provides helper functions that INSERT real row
 | `create_supplier(db, ...)` | A `Supplier` row |
 | `create_product(db, ...)` | A `Product` row |
 | `create_product_supplier(db, ...)` | A `ProductSupplier` link |
+| `create_store(db, ...)` | A `Store` row |
 
 All factories accept keyword arguments to override defaults.
 
@@ -302,8 +303,13 @@ Let's walk through adding a **Categories** feature — a new domain that manages
 
 ```python
 # app/models/category.py
-from sqlalchemy import Column, ForeignKey, String, Text
+from __future__ import annotations
+
+import uuid
+
+from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel
 
@@ -311,9 +317,13 @@ from app.models.base import BaseModel
 class Category(BaseModel):
     __tablename__ = "categories"
 
-    org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
-    name = Column(String(255), nullable=False)
-    description = Column(Text, nullable=True)
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
 ```
 
 ### Step 2: Register the model
