@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from enum import Enum as PyEnum
 
 from pydantic import BaseModel, Field
 
@@ -59,3 +60,48 @@ class PaginatedInventoryResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+# ── Movement schemas ──────────────────────────────────────────────────────────
+
+
+class MovementTypeEnum(str, PyEnum):
+    """Movement type for API responses."""
+
+    RECEIPT = "receipt"
+    SALE = "sale"
+
+
+class RecordReceiptRequest(BaseModel):
+    """Request to record an inventory receipt."""
+
+    quantity: int = Field(..., gt=0, description="Quantity received")
+    unit_cost: Decimal | None = Field(None, description="Unit cost per item")
+    reference_number: str | None = Field(None, max_length=100)
+    notes: str | None = Field(None, description="Receipt notes")
+
+
+class RecordSaleRequest(BaseModel):
+    """Request to record an inventory sale."""
+
+    quantity: int = Field(..., gt=0, description="Quantity sold")
+    unit_price: Decimal | None = Field(None, description="Unit price per item")
+    reference_number: str | None = Field(None, max_length=100)
+    notes: str | None = Field(None, description="Sale notes")
+
+
+class MovementRead(BaseModel):
+    """Schema for reading inventory movement records."""
+
+    id: uuid.UUID
+    store_inventory_id: uuid.UUID
+    movement_type: MovementTypeEnum
+    quantity: int
+    unit_cost: Decimal | None
+    unit_price: Decimal | None
+    reference_number: str | None
+    notes: str | None
+    performed_by_user_id: uuid.UUID
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
