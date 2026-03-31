@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -14,6 +15,9 @@ from app.core.exceptions import AppError, NotFound
 from app.models.inventory_movement import InventoryMovement, MovementType
 from app.models.product import Product
 from app.models.store_inventory import StoreInventory
+
+if TYPE_CHECKING:
+    from app.store_inventory.schemas import RecordReceiptRequest, RecordSaleRequest
 
 
 async def add_product(
