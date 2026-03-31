@@ -19,6 +19,7 @@ from app.models.product_supplier import ProductSupplier
 from app.models.store import Store
 from app.models.supplier import Supplier
 from app.models.user import User
+from app.models.zone import Zone
 
 
 async def create_user(
@@ -197,3 +198,23 @@ async def create_layout_version(
     db.add(layout)
     await db.flush()
     return layout
+
+
+async def create_zone(
+    db: AsyncSession,
+    *,
+    layout_version_id: uuid.UUID,
+    name: str = "Zone A",
+    color: str = "#FF0000",
+    cells: list[dict] | None = None,
+) -> Zone:
+    """Insert a ``Zone`` row and return it."""
+    zone = Zone(
+        layout_version_id=layout_version_id,
+        name=name,
+        color=color,
+        cells=cells or [{"row": 0, "col": 0}],
+    )
+    db.add(zone)
+    await db.flush()
+    return zone
