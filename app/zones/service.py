@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError, NotFound
+from app.models.fixture import Fixture
 from app.models.layout_version import LayoutVersion
 from app.models.zone import Zone
 from app.zones.schemas import ZoneCreate, ZoneUpdate
@@ -65,7 +66,19 @@ async def _check_zone_overlap(
                 status_code=409,
             )
 
-    # TODO(BE-08): also check overlap against fixtures once the Fixture model exists.
+    # Check overlap against fixtures (BE-08)
+    fixture_result = await db.execute(
+        select(Fixture).where(Fixture.layout_version_id == layout_version_id)
+    )
+    for fixture in fixture_result.scalars().all():
+        fixture_cells: set[tuple[int, int]] = {(c["row"], c["col"]) for c in fixture.cells}
+        overlap = requested & fixture_cells
+        if overlap:
+            label = f"fixture '{fixture.name}'" if fixture.name else f"a {fixture.fixture_type.value} fixture"
+            raise AppError(
+                f"Cells {sorted(overlap)} overlap with existing {label}",
+                status_code=409,
+            )
 
 
 # ── Public service functions ──────────────────────────────────────────────────
