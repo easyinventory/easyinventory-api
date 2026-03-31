@@ -33,4 +33,3 @@ class LayoutVersionRead(BaseModel):
     zones: list[ZoneRead] = Field(default_factory=list)
     # fixtures populated in BE-08
     fixtures: list = Field(default_factory=list)
-

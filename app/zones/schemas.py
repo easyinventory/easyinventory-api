@@ -23,7 +23,9 @@ class ZoneCreate(BaseModel):
     color: str = Field(
         ..., pattern=r"^#[0-9A-Fa-f]{6}$", description="Hex colour, e.g. #FF5733"
     )
-    cells: list[CellPosition] = Field(..., min_length=1, description="At least 1 cell required")
+    cells: list[CellPosition] = Field(
+        ..., min_length=1, description="At least 1 cell required"
+    )
 
     @field_validator("cells")
     @classmethod
@@ -47,7 +49,9 @@ class ZoneUpdate(BaseModel):
 
     @field_validator("cells")
     @classmethod
-    def no_duplicate_cells(cls, v: Optional[list[CellPosition]]) -> Optional[list[CellPosition]]:
+    def no_duplicate_cells(
+        cls, v: Optional[list[CellPosition]]
+    ) -> Optional[list[CellPosition]]:
         """Reject duplicate (row, col) pairs within a single zone."""
         if v is None:
             return v

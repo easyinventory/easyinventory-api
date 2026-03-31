@@ -13,7 +13,6 @@ from app.models.layout_version import LayoutVersion
 from app.models.zone import Zone
 from app.zones.schemas import ZoneCreate, ZoneUpdate
 
-
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 
@@ -117,7 +116,9 @@ async def get_zone(
     )
     zone = result.scalar_one_or_none()
     if zone is None:
-        raise NotFound(f"Zone {zone_id} not found in layout version {layout_version_id}")
+        raise NotFound(
+            f"Zone {zone_id} not found in layout version {layout_version_id}"
+        )
     return zone
 
 
