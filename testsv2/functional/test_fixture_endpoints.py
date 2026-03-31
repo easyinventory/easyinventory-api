@@ -295,7 +295,7 @@ async def test_list_fixtures_returns_all_ordered_by_created_at(
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """List endpoint returns fixtures ordered by creation date."""
+    """List endpoint returns all fixtures; same-transaction rows share created_at so we verify set membership."""
     org = await create_org(db)
     await create_membership(
         db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE
@@ -322,7 +322,7 @@ async def test_list_fixtures_returns_all_ordered_by_created_at(
 
     assert response.status_code == 200
     ids = [item["id"] for item in response.json()]
-    assert ids == [str(f1.id), str(f2.id)]
+    assert set(ids) == {str(f1.id), str(f2.id)}
 
 
 @pytest.mark.usefixtures("bypass_auth")

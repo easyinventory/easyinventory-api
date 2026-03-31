@@ -234,7 +234,7 @@ async def create_fixture(
         layout_version_id=layout_version_id,
         fixture_type=fixture_type,
         name=name,
-        cells=cells or [{"row": 4, "col": 4}],
+        cells=cells if cells is not None else [{"row": 4, "col": 4}],
     )
     db.add(fixture)
     await db.flush()

@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError, NotFound
-from app.models.fixture import Fixture, FixtureType
+from app.models.fixture import Fixture
 from app.models.layout_version import LayoutVersion
 from app.models.zone import Zone
 from app.fixtures.schemas import FixtureCreate, FixtureUpdate
@@ -150,7 +150,7 @@ async def list_fixtures(
     result = await db.execute(
         select(Fixture)
         .where(Fixture.layout_version_id == layout_version_id)
-        .order_by(Fixture.created_at)
+        .order_by(Fixture.created_at.asc(), Fixture.id.asc())
     )
     return list(result.scalars().all())
 

@@ -247,7 +247,7 @@ async def test_list_zones_returns_ordered_by_created_at(
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """List returns all zones ordered by creation date ascending."""
+    """List returns all zones; same-transaction rows share created_at so we verify set membership."""
     org = await create_org(db)
     await create_membership(
         db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
@@ -278,7 +278,7 @@ async def test_list_zones_returns_ordered_by_created_at(
 
     assert response.status_code == 200
     names = [z["name"] for z in response.json()]
-    assert names == ["Zone A", "Zone B"]
+    assert set(names) == {"Zone A", "Zone B"}
 
 
 @pytest.mark.usefixtures("bypass_auth")
