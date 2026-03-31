@@ -5,6 +5,7 @@ from app.models.org_membership import OrgMembership
 from app.models.supplier import Supplier
 from app.models.product import Product
 from app.models.product_supplier import ProductSupplier
+from app.models.store import Store
 
 __all__ = [
     "BaseModel",
@@ -14,4 +15,5 @@ __all__ = [
     "Supplier",
     "Product",
     "ProductSupplier",
+    "Store",
 ]
