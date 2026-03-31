@@ -30,7 +30,12 @@ class InventoryMovement(BaseModel):
         index=True,
     )
     movement_type: Mapped[MovementType] = mapped_column(
-        Enum(MovementType, name="movement_type"),
+        Enum(
+            MovementType,
+            values_callable=lambda x: [e.value for e in x],
+            name="movement_type",
+            create_type=False,
+        ),
         nullable=False,
     )
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
