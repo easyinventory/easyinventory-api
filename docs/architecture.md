@@ -79,9 +79,9 @@ easyinventory-api/
 │   │   └── service.py           #   Zone data access (create, list, get, update, delete)
 │   │
 │   ├── store_inventory/         # Store inventory domain
-│   │   ├── routes.py            #   Inventory CRUD + receipt/sale movement endpoints (store-scoped)
-│   │   ├── schemas.py           #   StoreInventory schemas + MovementRead / RecordReceiptRequest / RecordSaleRequest
-│   │   └── service.py           #   Inventory data access + record_receipt / record_sale (quantity validated)
+│   │   ├── routes.py            #   Inventory CRUD + receipt/sale + placement endpoints (store-scoped)
+│   │   ├── schemas.py           #   StoreInventory schemas + MovementRead / RecordReceiptRequest / RecordSaleRequest + AssignZoneRequest / PlacementRead
+│   │   └── service.py           #   Inventory data access + record_receipt / record_sale + assign_zone / get_placement_history / remove_from_zone
 │   │
 │   ├── suppliers/               # Suppliers domain
 │   │   ├── routes.py            #   Supplier CRUD endpoints
@@ -113,6 +113,7 @@ easyinventory-api/
 │       ├── layout_version.py    #   LayoutVersion (store-scoped, version_number, rows, cols, is_active)
 │       ├── store_inventory.py   #   StoreInventory (store + product link, quantity, unit_price, low-stock threshold)
 │       ├── inventory_movement.py #  InventoryMovement (audit trail of receipts/sales; MovementType enum)
+│       ├── inventory_placement.py # InventoryPlacement (zone assignment history; started_at / zone_name / duration_display computed helpers)
 │       ├── zone.py              #   Zone (layout-version-scoped, name, color, cells JSON)
 │       └── fixture.py           #   Fixture (layout-version-scoped, product reference, type, cell position)
 │
@@ -479,6 +480,17 @@ All ORM models inherit from `BaseModel` (defined in `app/models/base.py`), which
                                               │   performed_by_user)  │
                                               └───────────────────────┘
 
+                                              ┌────────────▼──────────┐
+                                              │  InventoryPlacement   │
+                                              │  (zone_id FK,         │
+                                              │   ended_at nullable,  │
+                                              │   placed_by_user)     │
+                                              └────────────┬──────────┘
+                                                           │
+                                                      ┌────▼────┐
+                                                      │  Zone   │
+                                                      └─────────┘
+
                                           ┌───────────────┐
                                           │LayoutVersion  │
                                           └────┬──────────┘
@@ -499,6 +511,7 @@ All ORM models inherit from `BaseModel` (defined in `app/models/base.py`), which
 | `Store` | `stores` | `org_id` (FK, CASCADE), `name`, `is_active`, `updated_at` | → `LayoutVersion` (one-to-many), → `StoreInventory` (one-to-many) |
 | `StoreInventory` | `store_inventory` | `store_id` (FK, CASCADE), `product_id` (FK, CASCADE), `quantity`, `unit_price`, `low_stock_threshold`, `updated_at` | → `Store`, → `Product`; unique on `(store_id, product_id)` |
 | `InventoryMovement` | `inventory_movements` | `store_inventory_id` (FK, CASCADE), `movement_type` (enum: `receipt`/`sale`), `quantity`, `unit_cost`, `unit_price`, `reference_number`, `notes`, `performed_by_user_id` (FK, RESTRICT) | → `StoreInventory`, → `User` |
+| `InventoryPlacement` | `inventory_placements` | `store_inventory_id` (FK, CASCADE), `zone_id` (FK, CASCADE), `ended_at` (nullable — NULL means active), `placed_by_user_id` (FK, RESTRICT) | → `StoreInventory`, → `Zone`, → `User`; partial unique index on `(store_inventory_id)` WHERE `ended_at IS NULL` |
 | `LayoutVersion` | `layout_versions` | `store_id` (FK, CASCADE), `version_number`, `rows`, `cols`, `is_active`, `updated_at` | → `Zone` (one-to-many); unique on `(store_id, version_number)` |
 | `Zone` | `zones` | `layout_version_id` (FK, CASCADE), `name`, `color`, `cells` (JSON), `updated_at` | → `LayoutVersion` |
 
@@ -517,6 +530,9 @@ All ORM models inherit from `BaseModel` (defined in `app/models/base.py`), which
 - **Inventory product contract** — The `product` field on `StoreInventoryRead` is non-optional (`ProductSummary`, not `ProductSummary | None`). The `product_id` FK is `NOT NULL` and `get_entry` always uses `selectinload`, so a missing product would indicate a data integrity failure rather than an expected empty state.
 - **Inventory movements as an append-only audit trail** — `InventoryMovement` rows are never updated or deleted. Every stock change (receipt or sale) creates a new row, giving a complete history of when stock changed, by how much, at what cost/price, with which reference number, and which user initiated it. `performed_by_user_id` uses `ondelete="RESTRICT"` to prevent deleting a user whose movement records exist. `store_inventory_id` uses `ondelete="CASCADE"` so movements are cleaned up with their parent inventory entry.
 - **Sale validation prevents negative stock** — `record_sale` checks `inventory.quantity >= data.quantity` before writing. If insufficient stock is available it raises an `AppError(400)` before any database write occurs, so no partial state is created.
+- **Zone placement as a temporal history** — `InventoryPlacement` records where on the shop floor an inventory item is (or was) located. `ended_at IS NULL` means the item is currently in that zone. Assigning to a new zone closes all previous active placements in a single explicit `db.flush()` before inserting the new row, ensuring the partial unique index on `(store_inventory_id) WHERE ended_at IS NULL` is never violated within the same transaction.
+- **Single-active-placement enforced at DB level** — A partial unique index (`uix_inventory_placements_active`) on `inventory_placements(store_inventory_id) WHERE ended_at IS NULL` prevents concurrent requests from creating two active placements for the same item. The service validates and closes all active rows defensively (in case of historical inconsistency) and flushes updates before the insert.
+- **Placement `duration_display` as a computed model property** — The human-readable duration (e.g. `"2 days, 3 hrs"`) is derived from `created_at` and `ended_at` in Python via a standalone `compute_duration_display()` function called by the `@property`. This avoids a DB-level computed column and keeps the logic easily testable without a database session.
 
 ---
 

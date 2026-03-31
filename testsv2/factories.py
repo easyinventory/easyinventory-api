@@ -7,11 +7,13 @@ arguments let individual tests customise only the fields they care about.
 """
 
 import uuid
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.roles import OrgRole, SystemRole
+from app.models.inventory_placement import InventoryPlacement
 from app.models.layout_version import LayoutVersion
 from app.models.organization import Organization
 from app.models.org_membership import OrgMembership
@@ -263,3 +265,23 @@ async def create_store_inventory(
     db.add(entry)
     await db.flush()
     return entry
+
+
+async def create_inventory_placement(
+    db: AsyncSession,
+    *,
+    store_inventory_id: uuid.UUID,
+    zone_id: uuid.UUID,
+    placed_by_user_id: uuid.UUID,
+    ended_at: datetime | None = None,
+) -> InventoryPlacement:
+    """Insert an ``InventoryPlacement`` row and return it."""
+    placement = InventoryPlacement(
+        store_inventory_id=store_inventory_id,
+        zone_id=zone_id,
+        placed_by_user_id=placed_by_user_id,
+        ended_at=ended_at,
+    )
+    db.add(placement)
+    await db.flush()
+    return placement

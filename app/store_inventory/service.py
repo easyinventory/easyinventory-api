@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -13,8 +14,11 @@ from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AppError, NotFound
 from app.models.inventory_movement import InventoryMovement, MovementType
+from app.models.inventory_placement import InventoryPlacement
+from app.models.layout_version import LayoutVersion
 from app.models.product import Product
 from app.models.store_inventory import StoreInventory
+from app.models.zone import Zone
 
 if TYPE_CHECKING:
     from app.store_inventory.schemas import RecordReceiptRequest, RecordSaleRequest
@@ -327,3 +331,155 @@ async def record_sale(
     await db.flush()
     await db.refresh(movement)
     return movement
+
+
+# ── Inventory placements ──────────────────────────────────────────────────────
+
+
+async def assign_zone(
+    db: AsyncSession,
+    inventory_id: uuid.UUID,
+    store_id: uuid.UUID,
+    zone_id: uuid.UUID,
+    user_id: uuid.UUID,
+) -> InventoryPlacement:
+    """
+    Assign an inventory item to a zone, closing the previous active placement.
+
+    Steps:
+    1. Validate the inventory entry belongs to the given store.
+    2. Validate the zone belongs to a layout version for the same store.
+    3. Close the currently active placement (if any) by setting ``ended_at``.
+    4. Create and persist a new placement record.
+
+    Raises :class:`NotFound` if the inventory entry or zone cannot be found
+    in the given store's scope.
+    """
+    # 1 — verify inventory belongs to store
+    inv_result = await db.execute(
+        select(StoreInventory).where(
+            and_(
+                StoreInventory.id == inventory_id,
+                StoreInventory.store_id == store_id,
+            )
+        )
+    )
+    if inv_result.scalar_one_or_none() is None:
+        raise NotFound(f"Inventory entry {inventory_id} not found in store {store_id}")
+
+    # 2 — verify zone belongs to one of this store's layout versions
+    zone_result = await db.execute(
+        select(Zone)
+        .join(LayoutVersion, Zone.layout_version_id == LayoutVersion.id)
+        .where(and_(Zone.id == zone_id, LayoutVersion.store_id == store_id))
+    )
+    if zone_result.scalar_one_or_none() is None:
+        raise NotFound(f"Zone {zone_id} not found in store {store_id}")
+
+    # 3 — close all currently active placements for this item.
+    # The partial unique index (store_inventory_id WHERE ended_at IS NULL)
+    # guarantees at most one active row under normal conditions, but we close
+    # all to guard against any pre-existing inconsistency.  We flush these
+    # UPDATEs explicitly before the INSERT so the partial unique index is
+    # satisfied when the new row lands — without this the unit-of-work could
+    # attempt the INSERT while the previous row is still ended_at=NULL.
+    active_result = await db.execute(
+        select(InventoryPlacement).where(
+            and_(
+                InventoryPlacement.store_inventory_id == inventory_id,
+                InventoryPlacement.ended_at.is_(None),
+            )
+        )
+    )
+    now = datetime.now(timezone.utc)
+    for active in active_result.scalars().all():
+        active.ended_at = now
+    await db.flush()  # must land before the new INSERT to satisfy the unique index
+
+    # 4 — create the new placement
+    placement = InventoryPlacement(
+        store_inventory_id=inventory_id,
+        zone_id=zone_id,
+        placed_by_user_id=user_id,
+    )
+    db.add(placement)
+    await db.flush()
+
+    # Re-fetch with zone eagerly loaded so computed properties work immediately
+    fetched = await db.execute(
+        select(InventoryPlacement)
+        .where(InventoryPlacement.id == placement.id)
+        .options(selectinload(InventoryPlacement.zone))
+    )
+    return fetched.scalar_one()
+
+
+async def get_placement_history(
+    db: AsyncSession,
+    inventory_id: uuid.UUID,
+    store_id: uuid.UUID,
+) -> list[InventoryPlacement]:
+    """
+    Return the full placement history for an inventory item, newest first.
+
+    Raises :class:`NotFound` if the inventory entry does not belong to the
+    given store.
+    """
+    inv_result = await db.execute(
+        select(StoreInventory).where(
+            and_(
+                StoreInventory.id == inventory_id,
+                StoreInventory.store_id == store_id,
+            )
+        )
+    )
+    if inv_result.scalar_one_or_none() is None:
+        raise NotFound(f"Inventory entry {inventory_id} not found in store {store_id}")
+
+    result = await db.execute(
+        select(InventoryPlacement)
+        .where(InventoryPlacement.store_inventory_id == inventory_id)
+        .options(selectinload(InventoryPlacement.zone))
+        .order_by(InventoryPlacement.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+async def remove_from_zone(
+    db: AsyncSession,
+    inventory_id: uuid.UUID,
+    store_id: uuid.UUID,
+) -> None:
+    """
+    Remove an inventory item from its current zone by closing the active placement.
+
+    Raises :class:`NotFound` if the inventory entry does not belong to the
+    given store, or if there is no active placement to close.
+    """
+    inv_result = await db.execute(
+        select(StoreInventory).where(
+            and_(
+                StoreInventory.id == inventory_id,
+                StoreInventory.store_id == store_id,
+            )
+        )
+    )
+    if inv_result.scalar_one_or_none() is None:
+        raise NotFound(f"Inventory entry {inventory_id} not found in store {store_id}")
+
+    active_result = await db.execute(
+        select(InventoryPlacement).where(
+            and_(
+                InventoryPlacement.store_inventory_id == inventory_id,
+                InventoryPlacement.ended_at.is_(None),
+            )
+        )
+    )
+    actives = list(active_result.scalars().all())
+    if not actives:
+        raise NotFound(f"No active placement found for inventory entry {inventory_id}")
+
+    ended_at = datetime.now(timezone.utc)
+    for active in actives:
+        active.ended_at = ended_at
+    await db.flush()

@@ -10,11 +10,14 @@ from app.core.roles import OrgRole
 from app.models.org_membership import OrgMembership
 from app.models.store import Store
 from app.models.inventory_movement import InventoryMovement
+from app.models.inventory_placement import InventoryPlacement
 from app.orgs.deps import RequireOrgRole, get_current_org_membership
 from app.stores.deps import get_store_from_path
 from app.store_inventory.schemas import (
+    AssignZoneRequest,
     MovementRead,
     PaginatedInventoryResponse,
+    PlacementRead,
     RecordReceiptRequest,
     RecordSaleRequest,
     StoreInventoryCreate,
@@ -23,11 +26,14 @@ from app.store_inventory.schemas import (
 )
 from app.store_inventory.service import (
     add_product,
+    assign_zone,
     delete_entry,
     get_entry,
+    get_placement_history,
     list_inventory,
     record_receipt,
     record_sale,
+    remove_from_zone,
     update_entry,
 )
 from app.models.store_inventory import StoreInventory
@@ -159,3 +165,57 @@ async def record_inventory_sale(
     movement = await record_sale(db, inventory_id, store.id, data, membership.user_id)
     await db.commit()
     return movement
+
+
+# ── Placement endpoints ──────────────────────────────────────────────────────
+
+
+@router.patch(
+    "/{inventory_id}/placements",
+    response_model=PlacementRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def assign_inventory_to_zone(
+    inventory_id: uuid.UUID,
+    data: AssignZoneRequest,
+    store: Store = Depends(get_store_from_path),
+    db: AsyncSession = Depends(get_db),
+    membership: OrgMembership = Depends(get_current_org_membership),
+) -> InventoryPlacement:
+    """
+    Assign an inventory item to a zone.
+
+    Creates a new placement and automatically closes the previous active
+    placement (if any).  The zone must belong to one of the store's layout
+    versions.
+    """
+    placement = await assign_zone(
+        db, inventory_id, store.id, data.active_zone_id, membership.user_id
+    )
+    await db.commit()
+    return placement
+
+
+@router.get("/{inventory_id}/placements", response_model=list[PlacementRead])
+async def list_placement_history(
+    inventory_id: uuid.UUID,
+    store: Store = Depends(get_store_from_path),
+    db: AsyncSession = Depends(get_db),
+) -> list[InventoryPlacement]:
+    """Return the full zone-placement history for an inventory item, newest first."""
+    return await get_placement_history(db, inventory_id, store.id)
+
+
+@router.delete(
+    "/{inventory_id}/placements/current",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def remove_inventory_from_zone(
+    inventory_id: uuid.UUID,
+    store: Store = Depends(get_store_from_path),
+    db: AsyncSession = Depends(get_db),
+    _membership: OrgMembership = Depends(get_current_org_membership),
+) -> None:
+    """Remove an inventory item from its current zone."""
+    await remove_from_zone(db, inventory_id, store.id)
+    await db.commit()
