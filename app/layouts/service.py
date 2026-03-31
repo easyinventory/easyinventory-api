@@ -6,6 +6,7 @@ import uuid
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import NotFound
 from app.models.layout_version import LayoutVersion
@@ -78,11 +79,13 @@ async def get_active_layout(
     store_id: uuid.UUID,
 ) -> LayoutVersion:
     """Return the currently active layout version for the store."""
-    # TODO(BE-07): add .options(selectinload(LayoutVersion.zones)) once the Zone
-    #              model and relationship are introduced in the zones-cellset PR.
-    stmt = select(LayoutVersion).where(
-        LayoutVersion.store_id == store_id,
-        LayoutVersion.is_active == True,  # noqa: E712
+    stmt = (
+        select(LayoutVersion)
+        .where(
+            LayoutVersion.store_id == store_id,
+            LayoutVersion.is_active == True,  # noqa: E712
+        )
+        .options(selectinload(LayoutVersion.zones))
     )
     result = await db.execute(stmt)
     layout = result.scalar_one_or_none()
