@@ -78,6 +78,11 @@ easyinventory-api/
 │   │   ├── schemas.py           #   ZoneCreate / ZoneUpdate / ZoneRead schemas
 │   │   └── service.py           #   Zone data access (create, list, get, update, delete)
 │   │
+│   ├── store_inventory/         # Store inventory domain
+│   │   ├── routes.py            #   Inventory CRUD + receipt/sale movement endpoints (store-scoped)
+│   │   ├── schemas.py           #   StoreInventory schemas + MovementRead / RecordReceiptRequest / RecordSaleRequest
+│   │   └── service.py           #   Inventory data access + record_receipt / record_sale (quantity validated)
+│   │
 │   ├── suppliers/               # Suppliers domain
 │   │   ├── routes.py            #   Supplier CRUD endpoints
 │   │   ├── schemas.py           #   Supplier Pydantic schemas
@@ -107,6 +112,7 @@ easyinventory-api/
 │       ├── store.py             #   Store (org-scoped, is_active, updated_at)
 │       ├── layout_version.py    #   LayoutVersion (store-scoped, version_number, rows, cols, is_active)
 │       ├── store_inventory.py   #   StoreInventory (store + product link, quantity, unit_price, low-stock threshold)
+│       ├── inventory_movement.py #  InventoryMovement (audit trail of receipts/sales; MovementType enum)
 │       ├── zone.py              #   Zone (layout-version-scoped, name, color, cells JSON)
 │       └── fixture.py           #   Fixture (layout-version-scoped, product reference, type, cell position)
 │
@@ -453,20 +459,27 @@ All ORM models inherit from `BaseModel` (defined in `app/models/base.py`), which
 ┌──────────┐     ┌───────────────┐     ┌──────────────┐
 │   User   │────<│ OrgMembership │>────│ Organization │
 └──────────┘     └───────────────┘     └──────────────┘
-                                              │
-                      ┌───────────────────────┼───────────────┐
-                      │               │               │       │
-                ┌─────▼────┐   ┌──────▼─────┐   ┌────▼─────┐  │
-                │ Supplier │   │  Product   │   │  Store   │  │
-                └─────┬────┘   └──────┬──┬──┘   └────┬──┬──┘  │
-                      │               │  │            │  │     │
-                      └──────┐ ┌──────┘  └────┐  ┌───┘  │     │
-                      ┌──────▼─▼──────┐   ┌───▼──▼────────┐   │
-                      │ProductSupplier│   │StoreInventory │   │
-                      └───────────────┘   └───────────────┘   │
-                                                               │
-                                               ┌───────────────┘
-                                          ┌────▼──────────┐
+      │                                       │
+      │                   ┌───────────────────┼───────────────┐
+      │                   │               │               │       │
+      │             ┌─────▼────┐   ┌──────▼─────┐   ┌────▼─────┐
+      │             │ Supplier │   │  Product   │   │  Store   │
+      │             └─────┬────┘   └──────┬──┬──┘   └────┬──┬──┘
+      │                   │               │  │            │  │
+      │                   └──────┐ ┌──────┘  └────┐  ┌───┘  │
+      │             ┌────────────▼─▼────────┐  ┌──▼──▼──────────────┐
+      │             │  ProductSupplier      │  │   StoreInventory   │
+      │             └───────────────────────┘  └─────────┬──────────┘
+      │                                                   │
+      └───────────────────────────────────────────────────┤
+                                              ┌────────────▼──────────┐
+                                              │  InventoryMovement    │
+                                              │  (type, qty,          │
+                                              │   unit_cost/price,    │
+                                              │   performed_by_user)  │
+                                              └───────────────────────┘
+
+                                          ┌───────────────┐
                                           │LayoutVersion  │
                                           └────┬──────────┘
                                                │
@@ -485,6 +498,7 @@ All ORM models inherit from `BaseModel` (defined in `app/models/base.py`), which
 | `ProductSupplier` | `product_suppliers` | `product_id` (FK), `supplier_id` (FK), `is_active` | → `Supplier` / Unique on `(product_id, supplier_id)` |
 | `Store` | `stores` | `org_id` (FK, CASCADE), `name`, `is_active`, `updated_at` | → `LayoutVersion` (one-to-many), → `StoreInventory` (one-to-many) |
 | `StoreInventory` | `store_inventory` | `store_id` (FK, CASCADE), `product_id` (FK, CASCADE), `quantity`, `unit_price`, `low_stock_threshold`, `updated_at` | → `Store`, → `Product`; unique on `(store_id, product_id)` |
+| `InventoryMovement` | `inventory_movements` | `store_inventory_id` (FK, CASCADE), `movement_type` (enum: `receipt`/`sale`), `quantity`, `unit_cost`, `unit_price`, `reference_number`, `notes`, `performed_by_user_id` (FK, RESTRICT) | → `StoreInventory`, → `User` |
 | `LayoutVersion` | `layout_versions` | `store_id` (FK, CASCADE), `version_number`, `rows`, `cols`, `is_active`, `updated_at` | → `Zone` (one-to-many); unique on `(store_id, version_number)` |
 | `Zone` | `zones` | `layout_version_id` (FK, CASCADE), `name`, `color`, `cells` (JSON), `updated_at` | → `LayoutVersion` |
 
@@ -501,6 +515,8 @@ All ORM models inherit from `BaseModel` (defined in `app/models/base.py`), which
 - **Inventory conditional join** — `list_inventory` only joins the `products` table when `search` or `category` predicates are present. For the common unfiltered case the query stays on `store_inventory` alone and a `selectinload` fetches associated product rows efficiently via a separate IN-clause query. This avoids an unnecessary join for every basic list request.
 - **Stable inventory pagination** — The inventory list is ordered by `(created_at, id)`. The secondary `id` sort key ensures deterministic OFFSET/LIMIT pagination when multiple entries share the same `created_at` timestamp (which can happen when items are inserted in the same transaction).
 - **Inventory product contract** — The `product` field on `StoreInventoryRead` is non-optional (`ProductSummary`, not `ProductSummary | None`). The `product_id` FK is `NOT NULL` and `get_entry` always uses `selectinload`, so a missing product would indicate a data integrity failure rather than an expected empty state.
+- **Inventory movements as an append-only audit trail** — `InventoryMovement` rows are never updated or deleted. Every stock change (receipt or sale) creates a new row, giving a complete history of when stock changed, by how much, at what cost/price, with which reference number, and which user initiated it. `performed_by_user_id` uses `ondelete="RESTRICT"` to prevent deleting a user whose movement records exist. `store_inventory_id` uses `ondelete="CASCADE"` so movements are cleaned up with their parent inventory entry.
+- **Sale validation prevents negative stock** — `record_sale` checks `inventory.quantity >= data.quantity` before writing. If insufficient stock is available it raises an `AppError(400)` before any database write occurs, so no partial state is created.
 
 ---
 

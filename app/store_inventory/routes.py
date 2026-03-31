@@ -9,10 +9,14 @@ from app.core.database import get_db
 from app.core.roles import OrgRole
 from app.models.org_membership import OrgMembership
 from app.models.store import Store
-from app.orgs.deps import RequireOrgRole
+from app.models.inventory_movement import InventoryMovement
+from app.orgs.deps import RequireOrgRole, get_current_org_membership
 from app.stores.deps import get_store_from_path
 from app.store_inventory.schemas import (
+    MovementRead,
     PaginatedInventoryResponse,
+    RecordReceiptRequest,
+    RecordSaleRequest,
     StoreInventoryCreate,
     StoreInventoryRead,
     StoreInventoryUpdate,
@@ -22,6 +26,8 @@ from app.store_inventory.service import (
     delete_entry,
     get_entry,
     list_inventory,
+    record_receipt,
+    record_sale,
     update_entry,
 )
 from app.models.store_inventory import StoreInventory
@@ -123,3 +129,33 @@ async def delete_inventory_entry(
     """Delete an inventory entry. Owner role required."""
     await delete_entry(db, entry_id=entry_id, store_id=store.id)
     await db.commit()
+
+
+@router.post("/{inventory_id}/receipts", response_model=MovementRead, status_code=201)
+async def record_inventory_receipt(
+    inventory_id: uuid.UUID,
+    data: RecordReceiptRequest,
+    store: Store = Depends(get_store_from_path),
+    db: AsyncSession = Depends(get_db),
+    membership: OrgMembership = Depends(get_current_org_membership),
+) -> InventoryMovement:
+    """Record an inventory receipt (incoming stock)."""
+    movement = await record_receipt(
+        db, inventory_id, store.id, data, membership.user_id
+    )
+    await db.commit()
+    return movement
+
+
+@router.post("/{inventory_id}/sales", response_model=MovementRead, status_code=201)
+async def record_inventory_sale(
+    inventory_id: uuid.UUID,
+    data: RecordSaleRequest,
+    store: Store = Depends(get_store_from_path),
+    db: AsyncSession = Depends(get_db),
+    membership: OrgMembership = Depends(get_current_org_membership),
+) -> InventoryMovement:
+    """Record an inventory sale (outgoing stock)."""
+    movement = await record_sale(db, inventory_id, store.id, data, membership.user_id)
+    await db.commit()
+    return movement

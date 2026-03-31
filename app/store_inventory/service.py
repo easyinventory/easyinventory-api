@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -11,8 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AppError, NotFound
+from app.models.inventory_movement import InventoryMovement, MovementType
 from app.models.product import Product
 from app.models.store_inventory import StoreInventory
+
+if TYPE_CHECKING:
+    from app.store_inventory.schemas import RecordReceiptRequest, RecordSaleRequest
 
 
 async def add_product(
@@ -229,3 +234,96 @@ async def delete_entry(
     entry = await get_entry(db, entry_id=entry_id, store_id=store_id)
     await db.delete(entry)
     await db.flush()
+
+
+# ── Inventory movements ───────────────────────────────────────────────────────
+
+
+async def record_receipt(
+    db: AsyncSession,
+    inventory_id: uuid.UUID,
+    store_id: uuid.UUID,
+    data: "RecordReceiptRequest",
+    user_id: uuid.UUID,
+) -> InventoryMovement:
+    """
+    Record an inventory receipt and increment the stored quantity.
+
+    Raises NotFound if the inventory entry does not exist or does not belong
+    to the given store.
+    """
+    stmt = select(StoreInventory).where(
+        and_(StoreInventory.id == inventory_id, StoreInventory.store_id == store_id)
+    )
+    result = await db.execute(stmt)
+    inventory = result.scalars().first()
+    if not inventory:
+        raise NotFound(f"Inventory entry {inventory_id} not found in store {store_id}")
+
+    movement = InventoryMovement(
+        store_inventory_id=inventory_id,
+        movement_type=MovementType.RECEIPT,
+        quantity=data.quantity,
+        unit_cost=data.unit_cost,
+        reference_number=data.reference_number,
+        notes=data.notes,
+        performed_by_user_id=user_id,
+    )
+    db.add(movement)
+
+    inventory.quantity += data.quantity
+
+    await db.flush()
+    await db.refresh(movement)
+    return movement
+
+
+async def record_sale(
+    db: AsyncSession,
+    inventory_id: uuid.UUID,
+    store_id: uuid.UUID,
+    data: "RecordSaleRequest",
+    user_id: uuid.UUID,
+) -> InventoryMovement:
+    """
+    Record an inventory sale and decrement the stored quantity.
+
+    Raises NotFound if the inventory entry does not exist or does not belong
+    to the given store.
+    Raises AppError(400) if the sale quantity exceeds available stock.
+
+    Uses SELECT … FOR UPDATE to lock the row and prevent concurrent oversells.
+    """
+    stmt = (
+        select(StoreInventory)
+        .where(
+            and_(StoreInventory.id == inventory_id, StoreInventory.store_id == store_id)
+        )
+        .with_for_update()
+    )
+    result = await db.execute(stmt)
+    inventory = result.scalars().first()
+    if not inventory:
+        raise NotFound(f"Inventory entry {inventory_id} not found in store {store_id}")
+
+    if inventory.quantity < data.quantity:
+        raise AppError(
+            f"Insufficient stock: {inventory.quantity} available, {data.quantity} requested"
+        )
+
+    movement = InventoryMovement(
+        store_inventory_id=inventory_id,
+        movement_type=MovementType.SALE,
+        quantity=data.quantity,
+        unit_price=data.unit_price,
+        reference_number=data.reference_number,
+        notes=data.notes,
+        performed_by_user_id=user_id,
+    )
+    db.add(movement)
+
+    inventory.quantity -= data.quantity
+
+    await db.flush()
+    await db.refresh(movement)
+    return movement

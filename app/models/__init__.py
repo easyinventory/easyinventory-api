@@ -10,6 +10,7 @@ from app.models.layout_version import LayoutVersion
 from app.models.zone import Zone
 from app.models.fixture import Fixture
 from app.models.store_inventory import StoreInventory
+from app.models.inventory_movement import InventoryMovement, MovementType
 
 __all__ = [
     "BaseModel",
@@ -24,4 +25,6 @@ __all__ = [
     "Zone",
     "Fixture",
     "StoreInventory",
+    "InventoryMovement",
+    "MovementType",
 ]
