@@ -3,16 +3,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel
-
-if TYPE_CHECKING:
-    from app.models.zone import Zone
 
 
 class LayoutVersion(BaseModel):
@@ -37,11 +33,4 @@ class LayoutVersion(BaseModel):
         onupdate=func.now(),
         nullable=False,
     )
-
-    # Relationship stub — Zone model added in BE-07
-    zones: Mapped[list["Zone"]] = relationship(
-        "Zone",
-        back_populates="layout_version",
-        lazy="selectin",
-        cascade="all, delete-orphan",
-    )
+    # zones relationship added in BE-07 once the Zone model exists
