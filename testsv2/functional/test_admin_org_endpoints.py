@@ -7,6 +7,7 @@ at the route boundary since we don't have Cognito in the test environment.
 
 from __future__ import annotations
 
+import uuid
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -95,7 +96,7 @@ async def test_create_org_auto_creates_store(
         )
 
     assert response.status_code == 201
-    org_id = response.json()["id"]
+    org_id = uuid.UUID(response.json()["id"])
 
     # Verify the store was auto-created in the DB
     result = await db.execute(select(Store).where(Store.org_id == org_id))
