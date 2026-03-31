@@ -7,6 +7,7 @@ arguments let individual tests customise only the fields they care about.
 """
 
 import uuid
+from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +18,7 @@ from app.models.org_membership import OrgMembership
 from app.models.product import Product
 from app.models.product_supplier import ProductSupplier
 from app.models.store import Store
+from app.models.store_inventory import StoreInventory
 from app.models.supplier import Supplier
 from app.models.user import User
 from app.models.fixture import Fixture, FixtureType
@@ -239,3 +241,25 @@ async def create_fixture(
     db.add(fixture)
     await db.flush()
     return fixture
+
+
+async def create_store_inventory(
+    db: AsyncSession,
+    *,
+    store_id: uuid.UUID,
+    product_id: uuid.UUID,
+    quantity: float = 0.0,
+    unit_price: Decimal | None = None,
+    low_stock_threshold: float | None = None,
+) -> StoreInventory:
+    """Insert a ``StoreInventory`` row and return it."""
+    entry = StoreInventory(
+        store_id=store_id,
+        product_id=product_id,
+        quantity=quantity,
+        unit_price=unit_price,
+        low_stock_threshold=low_stock_threshold,
+    )
+    db.add(entry)
+    await db.flush()
+    return entry
