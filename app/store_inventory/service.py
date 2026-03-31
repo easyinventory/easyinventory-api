@@ -32,9 +32,7 @@ async def add_product(
     """
     # Validate the product belongs to the same org as the store.
     product_result = await db.execute(
-        select(Product).where(
-            and_(Product.id == product_id, Product.org_id == org_id)
-        )
+        select(Product).where(and_(Product.id == product_id, Product.org_id == org_id))
     )
     if product_result.scalar_one_or_none() is None:
         raise NotFound(f"Product {product_id} not found in organization {org_id}")

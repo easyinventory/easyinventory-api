@@ -58,7 +58,9 @@ async def test_add_product_default_quantity_is_zero(db: AsyncSession) -> None:
     store = await create_store(db, org_id=org.id)
     product = await create_product(db, org_id=org.id)
 
-    entry = await add_product(db, store_id=store.id, org_id=org.id, product_id=product.id)
+    entry = await add_product(
+        db, store_id=store.id, org_id=org.id, product_id=product.id
+    )
 
     assert entry.quantity == 0.0
 
