@@ -291,3 +291,50 @@ async def test_delete_inventory_entry_as_employee_returns_403(
     )
 
     assert response.status_code == 403
+
+
+@pytest.mark.usefixtures("bypass_auth")
+async def test_stock_product_as_employee_succeeds(
+    client: AsyncClient,
+    db: AsyncSession,
+    test_user: User,
+) -> None:
+    """POST is open to any org member, not just owners."""
+    org = await create_org(db)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE
+    )
+    store = await create_store(db, org_id=org.id)
+    product = await create_product(db, org_id=org.id)
+
+    response = await client.post(
+        _inventory_url(store.id),
+        json={"product_id": str(product.id)},
+        headers=_org_headers(org.id),
+    )
+
+    assert response.status_code == 201
+
+
+@pytest.mark.usefixtures("bypass_auth")
+async def test_stock_product_cross_org_product_returns_404(
+    client: AsyncClient,
+    db: AsyncSession,
+    test_user: User,
+) -> None:
+    """POST rejects a product_id that belongs to a different org (tenant isolation)."""
+    org = await create_org(db, name="Org A")
+    other_org = await create_org(db, name="Org B")
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
+    store = await create_store(db, org_id=org.id)
+    foreign_product = await create_product(db, org_id=other_org.id)
+
+    response = await client.post(
+        _inventory_url(store.id),
+        json={"product_id": str(foreign_product.id)},
+        headers=_org_headers(org.id),
+    )
+
+    assert response.status_code == 404

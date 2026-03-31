@@ -9,7 +9,7 @@ from app.core.database import get_db
 from app.core.roles import OrgRole
 from app.models.org_membership import OrgMembership
 from app.models.store import Store
-from app.orgs.deps import RequireOrgRole, get_current_org_membership
+from app.orgs.deps import RequireOrgRole
 from app.stores.deps import get_store_from_path
 from app.store_inventory.schemas import (
     StoreInventoryCreate,
@@ -42,6 +42,7 @@ async def stock_product(
     entry = await add_product(
         db,
         store_id=store.id,
+        org_id=store.org_id,
         product_id=data.product_id,
         quantity=data.quantity,
         unit_price=data.unit_price,
@@ -82,9 +83,7 @@ async def update_inventory_entry(
         db,
         entry_id=entry_id,
         store_id=store.id,
-        quantity=data.quantity,
-        unit_price=data.unit_price,
-        low_stock_threshold=data.low_stock_threshold,
+        **{k: v for k, v in data.model_dump().items() if k in data.model_fields_set},
     )
     await db.commit()
     return entry

@@ -14,14 +14,16 @@ class StoreInventoryCreate(BaseModel):
         default=None, description="Per-unit price (optional)"
     )
     low_stock_threshold: float | None = Field(
-        default=None, description="Alert threshold for low stock (optional)"
+        default=None,
+        ge=0,
+        description="Alert threshold for low stock (optional)",
     )
 
 
 class StoreInventoryUpdate(BaseModel):
     quantity: float | None = Field(default=None, ge=0)
     unit_price: Decimal | None = None
-    low_stock_threshold: float | None = None
+    low_stock_threshold: float | None = Field(default=None, ge=0)
 
 
 class StoreInventoryRead(BaseModel):

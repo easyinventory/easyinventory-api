@@ -36,6 +36,7 @@ async def test_add_product_creates_entry(db: AsyncSession) -> None:
     entry = await add_product(
         db,
         store_id=store.id,
+        org_id=org.id,
         product_id=product.id,
         quantity=10.0,
         unit_price=Decimal("4.99"),
@@ -57,7 +58,7 @@ async def test_add_product_default_quantity_is_zero(db: AsyncSession) -> None:
     store = await create_store(db, org_id=org.id)
     product = await create_product(db, org_id=org.id)
 
-    entry = await add_product(db, store_id=store.id, product_id=product.id)
+    entry = await add_product(db, store_id=store.id, org_id=org.id, product_id=product.id)
 
     assert entry.quantity == 0.0
 
@@ -71,9 +72,20 @@ async def test_add_product_duplicate_raises_409(db: AsyncSession) -> None:
     await create_store_inventory(db, store_id=store.id, product_id=product.id)
 
     with pytest.raises(AppError) as exc_info:
-        await add_product(db, store_id=store.id, product_id=product.id)
+        await add_product(db, store_id=store.id, org_id=org.id, product_id=product.id)
 
     assert exc_info.value.status_code == 409
+
+
+async def test_add_product_unknown_product_raises_not_found(db: AsyncSession) -> None:
+    """add_product raises NotFound when the product does not exist in the org."""
+    org = await create_org(db)
+    store = await create_store(db, org_id=org.id)
+    other_org = await create_org(db, name="Other Org")
+    product = await create_product(db, org_id=other_org.id)
+
+    with pytest.raises(NotFound):
+        await add_product(db, store_id=store.id, org_id=org.id, product_id=product.id)
 
 
 # ── list_inventory ────────────────────────────────────────────────────────────
