@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.org_membership import OrgMembership
+from app.models.organization import Organization
 
 
 async def list_org_members(
@@ -116,7 +117,9 @@ async def create_organization(db: AsyncSession, name: str) -> Organization:
     from admin routes, the bootstrap seeder, and any future flows so
     every org always has at least one store.
     """
-    from app.stores.service import create_store  # local import avoids circular at module level
+    from app.stores.service import (
+        create_store,
+    )  # local import avoids circular at module level
 
     org = Organization(name=name)
     db.add(org)

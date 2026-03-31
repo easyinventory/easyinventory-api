@@ -31,9 +31,7 @@ async def get_by_id(
     org_id: uuid.UUID,
 ) -> Store:
     """Get a store by ID, validating organization ownership."""
-    stmt = select(Store).where(
-        and_(Store.id == store_id, Store.org_id == org_id)
-    )
+    stmt = select(Store).where(and_(Store.id == store_id, Store.org_id == org_id))
     result = await db.execute(stmt)
     store = result.scalars().first()
     if store is None:

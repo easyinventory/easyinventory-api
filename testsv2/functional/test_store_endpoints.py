@@ -18,7 +18,6 @@ from testsv2.factories import (
 )
 from testsv2.functional.conftest import AUTH_HEADER
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -38,7 +37,9 @@ async def test_list_stores_empty(
 ) -> None:
     """Returns an empty list when the org has no stores."""
     org = await create_org(db, name="Empty Org")
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
 
     response = await client.get("/api/stores", headers=_org_headers(org.id))
 
@@ -54,7 +55,9 @@ async def test_list_stores_returns_stores(
 ) -> None:
     """Returns all stores that belong to the current org."""
     org = await create_org(db, name="Multi-Store Org")
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     await create_store(db, org_id=org.id, name="Store A")
     await create_store(db, org_id=org.id, name="Store B")
 
@@ -74,7 +77,9 @@ async def test_list_stores_scoped_to_org(
     """Stores from other orgs are not included in the response."""
     org_a = await create_org(db, name="Org A")
     org_b = await create_org(db, name="Org B")
-    await create_membership(db, org_id=org_a.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org_a.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     await create_store(db, org_id=org_a.id, name="Org A Store")
     await create_store(db, org_id=org_b.id, name="Org B Store")
 
@@ -97,7 +102,9 @@ async def test_create_store_as_owner(
 ) -> None:
     """Owner can create a new store; response is 201 with full StoreRead payload."""
     org = await create_org(db, name="Owner Org")
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
 
     response = await client.post(
         "/api/stores",
@@ -144,7 +151,9 @@ async def test_create_store_missing_name_returns_422(
 ) -> None:
     """Missing or empty name triggers a 422 validation error."""
     org = await create_org(db, name="Validation Org")
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
 
     response = await client.post(
         "/api/stores",
