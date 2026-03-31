@@ -376,7 +376,13 @@ async def assign_zone(
     if zone_result.scalar_one_or_none() is None:
         raise NotFound(f"Zone {zone_id} not found in store {store_id}")
 
-    # 3 — close the currently active placement if one exists
+    # 3 — close all currently active placements for this item.
+    # The partial unique index (store_inventory_id WHERE ended_at IS NULL)
+    # guarantees at most one active row under normal conditions, but we close
+    # all to guard against any pre-existing inconsistency.  We flush these
+    # UPDATEs explicitly before the INSERT so the partial unique index is
+    # satisfied when the new row lands — without this the unit-of-work could
+    # attempt the INSERT while the previous row is still ended_at=NULL.
     active_result = await db.execute(
         select(InventoryPlacement).where(
             and_(
@@ -385,9 +391,10 @@ async def assign_zone(
             )
         )
     )
-    active = active_result.scalar_one_or_none()
-    if active is not None:
-        active.ended_at = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    for active in active_result.scalars().all():
+        active.ended_at = now
+    await db.flush()  # must land before the new INSERT to satisfy the unique index
 
     # 4 — create the new placement
     placement = InventoryPlacement(
@@ -468,9 +475,11 @@ async def remove_from_zone(
             )
         )
     )
-    active = active_result.scalar_one_or_none()
-    if active is None:
+    actives = list(active_result.scalars().all())
+    if not actives:
         raise NotFound(f"No active placement found for inventory entry {inventory_id}")
 
-    active.ended_at = datetime.now(timezone.utc)
+    ended_at = datetime.now(timezone.utc)
+    for active in actives:
+        active.ended_at = ended_at
     await db.flush()

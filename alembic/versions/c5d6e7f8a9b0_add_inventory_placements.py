@@ -83,9 +83,24 @@ def upgrade() -> None:
         "inventory_placements",
         ["placed_by_user_id"],
     )
+    # Partial unique index: enforces at most one active placement per inventory
+    # item (ended_at IS NULL) at the database level, preventing concurrent
+    # inserts from creating multiple active rows and avoiding MultipleResultsFound
+    # errors in service queries.
+    op.create_index(
+        "uix_inventory_placements_active",
+        "inventory_placements",
+        ["store_inventory_id"],
+        unique=True,
+        postgresql_where="ended_at IS NULL",
+    )
 
 
 def downgrade() -> None:
+    op.drop_index(
+        "uix_inventory_placements_active",
+        table_name="inventory_placements",
+    )
     op.drop_index(
         "ix_inventory_placements_placed_by_user_id",
         table_name="inventory_placements",
