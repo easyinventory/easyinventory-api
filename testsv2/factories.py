@@ -213,7 +213,7 @@ async def create_zone(
         layout_version_id=layout_version_id,
         name=name,
         color=color,
-        cells=cells or [{"row": 0, "col": 0}],
+        cells=cells if cells is not None else [{"row": 0, "col": 0}],
     )
     db.add(zone)
     await db.flush()
