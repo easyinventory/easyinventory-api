@@ -140,7 +140,9 @@ async def record_inventory_receipt(
     membership: OrgMembership = Depends(get_current_org_membership),
 ) -> InventoryMovement:
     """Record an inventory receipt (incoming stock)."""
-    movement = await record_receipt(db, inventory_id, store.id, data, membership.user_id)
+    movement = await record_receipt(
+        db, inventory_id, store.id, data, membership.user_id
+    )
     await db.commit()
     return movement
 

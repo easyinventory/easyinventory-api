@@ -170,7 +170,9 @@ async def test_record_receipt_wrong_store_raises_not_found(db: AsyncSession) -> 
     store_b = await create_store(db, org_id=org.id)
     product = await create_product(db, org_id=org.id)
     # inventory belongs to store_a
-    inventory = await create_store_inventory(db, store_id=store_a.id, product_id=product.id)
+    inventory = await create_store_inventory(
+        db, store_id=store_a.id, product_id=product.id
+    )
     user = await create_user(db)
 
     data = RecordReceiptRequest(quantity=5)
