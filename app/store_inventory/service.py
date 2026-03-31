@@ -5,9 +5,10 @@ from __future__ import annotations
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AppError, NotFound
 from app.models.product import Product
@@ -63,28 +64,69 @@ async def add_product(
     # Catch unique-constraint violation from concurrent inserts and surface as 409.
     try:
         await db.flush()
-        await db.refresh(entry)
     except IntegrityError:
         raise AppError(
             f"Product {product_id} is already stocked in store {store_id}",
             status_code=409,
         )
-    return entry
+    # Re-fetch so the product relationship is eagerly loaded in the response.
+    return await get_entry(db, entry_id=entry.id, store_id=store_id)
 
 
 async def list_inventory(
     db: AsyncSession,
     *,
     store_id: uuid.UUID,
-) -> list[StoreInventory]:
-    """Return all inventory entries for a store, ordered by creation time."""
-    stmt = (
-        select(StoreInventory)
-        .where(StoreInventory.store_id == store_id)
-        .order_by(StoreInventory.created_at)
+    search: str | None = None,
+    category: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> tuple[list[StoreInventory], int]:
+    """
+    Return a paginated, optionally filtered list of inventory entries for a store.
+
+    - ``search`` performs a case-insensitive partial match on product name OR category.
+    - ``category`` performs a case-insensitive partial match on product category only.
+    - ``page`` / ``page_size`` control the offset-based pagination window.
+
+    Returns a ``(items, total)`` tuple where ``total`` is the unfiltered count.
+    """
+    filters = [StoreInventory.store_id == store_id]
+
+    if search:
+        term = f"%{search}%"
+        filters.append(
+            or_(
+                Product.name.ilike(term),
+                Product.category.ilike(term),
+            )
+        )
+
+    if category:
+        filters.append(Product.category.ilike(f"%{category}%"))
+
+    # Count matching rows before pagination.
+    count_stmt = (
+        select(func.count(StoreInventory.id))
+        .join(Product, StoreInventory.product_id == Product.id)
+        .where(*filters)
     )
-    result = await db.execute(stmt)
-    return list(result.scalars().all())
+    total: int = (await db.execute(count_stmt)).scalar_one()
+
+    # Fetch the requested page with joined product data.
+    items_stmt = (
+        select(StoreInventory)
+        .join(Product, StoreInventory.product_id == Product.id)
+        .where(*filters)
+        .options(selectinload(StoreInventory.product))
+        .order_by(StoreInventory.created_at)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    result = await db.execute(items_stmt)
+    items = list(result.scalars().all())
+
+    return items, total
 
 
 async def get_entry(
@@ -99,12 +141,14 @@ async def get_entry(
     Raises NotFound if the entry does not exist or belongs to a different store.
     """
     result = await db.execute(
-        select(StoreInventory).where(
+        select(StoreInventory)
+        .where(
             and_(
                 StoreInventory.id == entry_id,
                 StoreInventory.store_id == store_id,
             )
         )
+        .options(selectinload(StoreInventory.product))
     )
     entry = result.scalar_one_or_none()
     if entry is None:
@@ -144,8 +188,8 @@ async def update_entry(
         entry.low_stock_threshold = low_stock_threshold  # type: ignore[assignment]
 
     await db.flush()
-    await db.refresh(entry)
-    return entry
+    # Re-fetch so the product relationship is eagerly loaded in the response.
+    return await get_entry(db, entry_id=entry_id, store_id=store_id)
 
 
 async def delete_entry(
