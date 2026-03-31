@@ -11,6 +11,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.roles import OrgRole, SystemRole
+from app.models.layout_version import LayoutVersion
 from app.models.organization import Organization
 from app.models.org_membership import OrgMembership
 from app.models.product import Product
@@ -18,6 +19,8 @@ from app.models.product_supplier import ProductSupplier
 from app.models.store import Store
 from app.models.supplier import Supplier
 from app.models.user import User
+from app.models.fixture import Fixture, FixtureType
+from app.models.zone import Zone
 
 
 async def create_user(
@@ -174,3 +177,65 @@ async def create_store(
     db.add(store)
     await db.flush()
     return store
+
+
+async def create_layout_version(
+    db: AsyncSession,
+    *,
+    store_id: uuid.UUID,
+    rows: int = 5,
+    cols: int = 5,
+    version_number: int = 1,
+    is_active: bool = False,
+) -> LayoutVersion:
+    """Insert a ``LayoutVersion`` row and return it."""
+    layout = LayoutVersion(
+        store_id=store_id,
+        rows=rows,
+        cols=cols,
+        version_number=version_number,
+        is_active=is_active,
+    )
+    db.add(layout)
+    await db.flush()
+    return layout
+
+
+async def create_zone(
+    db: AsyncSession,
+    *,
+    layout_version_id: uuid.UUID,
+    name: str = "Zone A",
+    color: str = "#FF0000",
+    cells: list[dict] | None = None,
+) -> Zone:
+    """Insert a ``Zone`` row and return it."""
+    zone = Zone(
+        layout_version_id=layout_version_id,
+        name=name,
+        color=color,
+        cells=cells if cells is not None else [{"row": 0, "col": 0}],
+    )
+    db.add(zone)
+    await db.flush()
+    return zone
+
+
+async def create_fixture(
+    db: AsyncSession,
+    *,
+    layout_version_id: uuid.UUID,
+    fixture_type: FixtureType = FixtureType.WALL,
+    name: str | None = None,
+    cells: list[dict] | None = None,
+) -> Fixture:
+    """Insert a ``Fixture`` row and return it."""
+    fixture = Fixture(
+        layout_version_id=layout_version_id,
+        fixture_type=fixture_type,
+        name=name,
+        cells=cells if cells is not None else [{"row": 4, "col": 4}],
+    )
+    db.add(fixture)
+    await db.flush()
+    return fixture

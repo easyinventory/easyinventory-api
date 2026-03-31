@@ -18,6 +18,8 @@ Complete reference for every endpoint in the EasyInventory API. All routes retur
 - [Products](#products)
 - [Product–Supplier Links](#productsupplier-links)
 - [Stores](#stores)
+- [Layout Versions](#layout-versions)
+- [Zones](#zones)
 - [Admin: Organizations](#admin-organizations)
 - [Admin: Users](#admin-users)
 - [Invite Flow Details](#invite-flow-details)
@@ -671,6 +673,293 @@ Creates a new store within the current organization.
 **Errors:**
 - `403` — Caller is not the org owner.
 - `422` — Missing or empty `name`.
+
+---
+
+## Layout Versions
+
+Layout versions represent versioned grid configurations for a store. Each version defines a rows × cols grid. Only one version can be active at a time per store. Zones and fixtures (BE-08) are nested within a layout version.
+
+**All layout endpoints require a valid `X-Org-Id` header** and validate that `store_id` belongs to the caller's organization.
+
+---
+
+### `GET /api/stores/{store_id}/layouts`
+
+Returns all layout versions for the store ordered by `version_number` ascending.
+
+**Auth:** Required — any org member  
+**Response** `200`
+
+```json
+[
+  {
+    "id": "layout-uuid",
+    "store_id": "store-uuid",
+    "version_number": 1,
+    "rows": 10,
+    "cols": 8,
+    "is_active": false,
+    "created_at": "2026-03-31T10:00:00Z",
+    "updated_at": "2026-03-31T10:00:00Z",
+    "zones": [],
+    "fixtures": []
+  }
+]
+```
+
+**Errors:**
+- `404` — Store not found in the current org.
+
+---
+
+### `GET /api/stores/{store_id}/layouts/active`
+
+Returns the currently active layout version with zones and fixtures eagerly loaded.
+
+**Auth:** Required — any org member  
+**Response** `200`
+
+```json
+{
+  "id": "layout-uuid",
+  "store_id": "store-uuid",
+  "version_number": 2,
+  "rows": 10,
+  "cols": 8,
+  "is_active": true,
+  "created_at": "2026-03-31T10:00:00Z",
+  "updated_at": "2026-03-31T11:00:00Z",
+  "zones": [],
+  "fixtures": []
+}
+```
+
+**Errors:**
+- `404` — No active layout version exists for the store.
+- `404` — Store not found in the current org.
+
+---
+
+### `POST /api/stores/{store_id}/layouts`
+
+Creates a new layout version. The `version_number` is auto-incremented (starts at 1, increments by 1 for each subsequent version). New versions are inactive by default.
+
+**Auth:** Required — `ORG_OWNER` or `ORG_ADMIN`  
+**Request Body**
+
+```json
+{
+  "rows": 10,
+  "cols": 8
+}
+```
+
+| Field | Type | Required | Constraints | Description |
+|---|---|---|---|---|
+| `rows` | integer | Yes | min 2, max 30 | Number of grid rows |
+| `cols` | integer | Yes | min 2, max 30 | Number of grid columns |
+
+**Response** `201`
+
+```json
+{
+  "id": "layout-uuid",
+  "store_id": "store-uuid",
+  "version_number": 1,
+  "rows": 10,
+  "cols": 8,
+  "is_active": false,
+  "created_at": "2026-03-31T10:00:00Z",
+  "updated_at": "2026-03-31T10:00:00Z",
+  "zones": [],
+  "fixtures": []
+}
+```
+
+**Errors:**
+- `403` — Caller is not `ORG_OWNER` or `ORG_ADMIN`.
+- `404` — Store not found in the current org.
+- `422` — `rows` or `cols` is outside the 2–30 range.
+
+---
+
+### `POST /api/stores/{store_id}/layouts/{layout_id}/activate`
+
+Activates the specified layout version and deactivates all other versions for the store.
+
+**Auth:** Required — `ORG_OWNER` or `ORG_ADMIN`  
+**Response** `200` — Returns the now-active layout version.
+
+```json
+{
+  "id": "layout-uuid",
+  "store_id": "store-uuid",
+  "version_number": 2,
+  "rows": 10,
+  "cols": 8,
+  "is_active": true,
+  "created_at": "2026-03-31T10:00:00Z",
+  "updated_at": "2026-03-31T11:00:00Z",
+  "zones": [],
+  "fixtures": []
+}
+```
+
+**Errors:**
+- `403` — Caller is not `ORG_OWNER` or `ORG_ADMIN`.
+- `404` — Layout version not found for the store.
+- `404` — Store not found in the current org.
+
+---
+
+## Zones
+
+Zones represent named, coloured regions of a layout version's grid. Each zone owns a set of `(row, col)` cell positions. A cell may belong to at most one zone within a layout version.
+
+All zone endpoints are nested under a store and a layout version:
+`/api/stores/{store_id}/layouts/{layout_version_id}/zones`
+
+They require a valid `X-Org-Id` header and validate that both `store_id` and `layout_version_id` belong to the caller's organization.
+
+---
+
+### `GET /api/stores/{store_id}/layouts/{layout_version_id}/zones`
+
+Returns all zones for the layout version ordered by `created_at` ascending.
+
+**Auth:** Required — any org member  
+**Response** `200`
+
+```json
+[
+  {
+    "id": "zone-uuid",
+    "layout_version_id": "layout-uuid",
+    "name": "Produce",
+    "color": "#00FF00",
+    "cells": [
+      {"row": 0, "col": 0},
+      {"row": 0, "col": 1}
+    ],
+    "created_at": "2026-03-31T10:00:00Z",
+    "updated_at": "2026-03-31T10:00:00Z"
+  }
+]
+```
+
+**Errors:**
+- `404` — Layout version not found for the store.
+- `404` — Store not found in the current org.
+
+---
+
+### `POST /api/stores/{store_id}/layouts/{layout_version_id}/zones`
+
+Creates a new zone within a layout version.
+
+**Auth:** Required — `ORG_OWNER` or `ORG_ADMIN`  
+**Request Body**
+
+```json
+{
+  "name": "Produce",
+  "color": "#00FF00",
+  "cells": [
+    {"row": 0, "col": 0},
+    {"row": 0, "col": 1}
+  ]
+}
+```
+
+| Field | Type | Required | Constraints | Description |
+|---|---|---|---|---|
+| `name` | string | Yes | 1–100 chars | Zone display name |
+| `color` | string | Yes | `#RRGGBB` hex | Zone colour |
+| `cells` | array | Yes | min 1, no duplicates | Cell positions claimed by this zone |
+| `cells[].row` | integer | Yes | ≥ 0, < `layout.rows` | Row index (0-based) |
+| `cells[].col` | integer | Yes | ≥ 0, < `layout.cols` | Column index (0-based) |
+
+**Response** `201`
+
+```json
+{
+  "id": "zone-uuid",
+  "layout_version_id": "layout-uuid",
+  "name": "Produce",
+  "color": "#00FF00",
+  "cells": [
+    {"row": 0, "col": 0},
+    {"row": 0, "col": 1}
+  ],
+  "created_at": "2026-03-31T10:00:00Z",
+  "updated_at": "2026-03-31T10:00:00Z"
+}
+```
+
+**Errors:**
+- `400` — One or more cells lie outside the layout's grid dimensions.
+- `403` — Caller is not `ORG_OWNER` or `ORG_ADMIN`.
+- `404` — Layout version or store not found in the current org.
+- `409` — One or more cells overlap with an existing zone.
+- `422` — `cells` is empty, contains duplicates, or `color` is not a valid `#RRGGBB` hex string.
+
+---
+
+### `GET /api/stores/{store_id}/layouts/{layout_version_id}/zones/{zone_id}`
+
+Returns a single zone by ID.
+
+**Auth:** Required — any org member  
+**Response** `200` — Zone object (same shape as list items)
+
+**Errors:**
+- `404` — Zone, layout version, or store not found in the current org.
+
+---
+
+### `PUT /api/stores/{store_id}/layouts/{layout_version_id}/zones/{zone_id}`
+
+Partially updates a zone. Only the fields provided are changed.
+
+**Auth:** Required — `ORG_OWNER` or `ORG_ADMIN`  
+**Request Body** — all fields optional
+
+```json
+{
+  "name": "Dairy",
+  "color": "#0000FF",
+  "cells": [{"row": 1, "col": 0}]
+}
+```
+
+| Field | Type | Constraints | Description |
+|---|---|---|---|
+| `name` | string | 1–100 chars | New display name |
+| `color` | string | `#RRGGBB` hex | New colour |
+| `cells` | array | min 1, no duplicates, within grid bounds, no overlap (excluding self) | New cell set |
+
+**Response** `200` — Updated zone object
+
+**Errors:**
+- `400` — One or more new cells lie outside the layout's grid dimensions.
+- `403` — Caller is not `ORG_OWNER` or `ORG_ADMIN`.
+- `404` — Zone, layout version, or store not found in the current org.
+- `409` — New cells overlap with another existing zone.
+- `422` — Invalid field values.
+
+---
+
+### `DELETE /api/stores/{store_id}/layouts/{layout_version_id}/zones/{zone_id}`
+
+Deletes a zone.
+
+**Auth:** Required — `ORG_OWNER` or `ORG_ADMIN`  
+**Response** `204` — No content
+
+**Errors:**
+- `403` — Caller is not `ORG_OWNER` or `ORG_ADMIN`.
+- `404` — Zone, layout version, or store not found in the current org.
 
 ---
 
