@@ -8,6 +8,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.zones.schemas import ZoneRead
+from app.fixtures.schemas import FixtureRead
 
 
 class LayoutVersionCreate(BaseModel):
@@ -31,5 +32,4 @@ class LayoutVersionRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     zones: list[ZoneRead] = Field(default_factory=list)
-    # fixtures populated in BE-08
-    fixtures: list = Field(default_factory=list)
+    fixtures: list[FixtureRead] = Field(default_factory=list)

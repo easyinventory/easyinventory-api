@@ -21,6 +21,7 @@ from app.health.routes import router as health_router
 from app.layouts.routes import router as layouts_router
 from app.products.routes import router as products_router
 from app.zones.routes import router as zones_router
+from app.fixtures.routes import router as fixtures_router
 from app.stores.routes import router as stores_router
 from app.suppliers.routes import router as suppliers_router
 
@@ -87,6 +88,7 @@ def create_app() -> FastAPI:
     app.include_router(stores_router)
     app.include_router(layouts_router)
     app.include_router(zones_router)
+    app.include_router(fixtures_router)
 
     return app
 
