@@ -33,7 +33,7 @@ async def test_record_receipt_creates_movement(db: AsyncSession) -> None:
     user = await create_user(db)
 
     data = RecordReceiptRequest(quantity=10, unit_cost=Decimal("5.00"))
-    movement = await record_receipt(db, inventory.id, data, user.id)
+    movement = await record_receipt(db, inventory.id, store.id, data, user.id)
 
     assert movement.id is not None
     assert movement.store_inventory_id == inventory.id
@@ -55,7 +55,7 @@ async def test_record_receipt_increases_quantity(db: AsyncSession) -> None:
     user = await create_user(db)
 
     data = RecordReceiptRequest(quantity=10)
-    await record_receipt(db, inventory.id, data, user.id)
+    await record_receipt(db, inventory.id, store.id, data, user.id)
 
     await db.refresh(inventory)
     assert inventory.quantity == 15.0
@@ -69,7 +69,7 @@ async def test_record_receipt_not_found(db: AsyncSession) -> None:
     data = RecordReceiptRequest(quantity=5)
 
     with pytest.raises(NotFound):
-        await record_receipt(db, uuid4(), data, user.id)
+        await record_receipt(db, uuid4(), uuid4(), data, user.id)
 
 
 # ── record_sale ───────────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ async def test_record_sale_creates_movement(db: AsyncSession) -> None:
     user = await create_user(db)
 
     data = RecordSaleRequest(quantity=5, unit_price=Decimal("9.99"))
-    movement = await record_sale(db, inventory.id, data, user.id)
+    movement = await record_sale(db, inventory.id, store.id, data, user.id)
 
     assert movement.id is not None
     assert movement.store_inventory_id == inventory.id
@@ -107,7 +107,7 @@ async def test_record_sale_decreases_quantity(db: AsyncSession) -> None:
     user = await create_user(db)
 
     data = RecordSaleRequest(quantity=5)
-    await record_sale(db, inventory.id, data, user.id)
+    await record_sale(db, inventory.id, store.id, data, user.id)
 
     await db.refresh(inventory)
     assert inventory.quantity == 15.0
@@ -126,7 +126,7 @@ async def test_record_sale_insufficient_stock(db: AsyncSession) -> None:
     data = RecordSaleRequest(quantity=10)
 
     with pytest.raises(AppError) as exc_info:
-        await record_sale(db, inventory.id, data, user.id)
+        await record_sale(db, inventory.id, store.id, data, user.id)
 
     assert exc_info.value.status_code == 400
 
@@ -142,7 +142,7 @@ async def test_record_sale_exact_quantity_succeeds(db: AsyncSession) -> None:
     user = await create_user(db)
 
     data = RecordSaleRequest(quantity=10)
-    movement = await record_sale(db, inventory.id, data, user.id)
+    movement = await record_sale(db, inventory.id, store.id, data, user.id)
 
     await db.refresh(inventory)
     assert movement.quantity == 10
@@ -157,4 +157,41 @@ async def test_record_sale_not_found(db: AsyncSession) -> None:
     data = RecordSaleRequest(quantity=1)
 
     with pytest.raises(NotFound):
-        await record_sale(db, uuid4(), data, user.id)
+        await record_sale(db, uuid4(), uuid4(), data, user.id)
+
+
+# ── Cross-store isolation ────────────────────────────────────────────────────
+
+
+async def test_record_receipt_wrong_store_raises_not_found(db: AsyncSession) -> None:
+    """record_receipt raises NotFound when the inventory_id belongs to a different store."""
+    org = await create_org(db)
+    store_a = await create_store(db, org_id=org.id)
+    store_b = await create_store(db, org_id=org.id)
+    product = await create_product(db, org_id=org.id)
+    # inventory belongs to store_a
+    inventory = await create_store_inventory(db, store_id=store_a.id, product_id=product.id)
+    user = await create_user(db)
+
+    data = RecordReceiptRequest(quantity=5)
+    with pytest.raises(NotFound):
+        # passing store_b.id — should be rejected
+        await record_receipt(db, inventory.id, store_b.id, data, user.id)
+
+
+async def test_record_sale_wrong_store_raises_not_found(db: AsyncSession) -> None:
+    """record_sale raises NotFound when the inventory_id belongs to a different store."""
+    org = await create_org(db)
+    store_a = await create_store(db, org_id=org.id)
+    store_b = await create_store(db, org_id=org.id)
+    product = await create_product(db, org_id=org.id)
+    # inventory belongs to store_a with enough stock
+    inventory = await create_store_inventory(
+        db, store_id=store_a.id, product_id=product.id, quantity=20.0
+    )
+    user = await create_user(db)
+
+    data = RecordSaleRequest(quantity=5)
+    with pytest.raises(NotFound):
+        # passing store_b.id — should be rejected
+        await record_sale(db, inventory.id, store_b.id, data, user.id)

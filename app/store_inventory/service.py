@@ -242,19 +242,23 @@ async def delete_entry(
 async def record_receipt(
     db: AsyncSession,
     inventory_id: uuid.UUID,
+    store_id: uuid.UUID,
     data: "RecordReceiptRequest",
     user_id: uuid.UUID,
 ) -> InventoryMovement:
     """
     Record an inventory receipt and increment the stored quantity.
 
-    Raises NotFound if the inventory entry does not exist.
+    Raises NotFound if the inventory entry does not exist or does not belong
+    to the given store.
     """
-    stmt = select(StoreInventory).where(StoreInventory.id == inventory_id)
+    stmt = select(StoreInventory).where(
+        and_(StoreInventory.id == inventory_id, StoreInventory.store_id == store_id)
+    )
     result = await db.execute(stmt)
     inventory = result.scalars().first()
     if not inventory:
-        raise NotFound(f"Inventory entry {inventory_id} not found")
+        raise NotFound(f"Inventory entry {inventory_id} not found in store {store_id}")
 
     movement = InventoryMovement(
         store_inventory_id=inventory_id,
@@ -277,20 +281,30 @@ async def record_receipt(
 async def record_sale(
     db: AsyncSession,
     inventory_id: uuid.UUID,
+    store_id: uuid.UUID,
     data: "RecordSaleRequest",
     user_id: uuid.UUID,
 ) -> InventoryMovement:
     """
     Record an inventory sale and decrement the stored quantity.
 
-    Raises NotFound if the inventory entry does not exist.
+    Raises NotFound if the inventory entry does not exist or does not belong
+    to the given store.
     Raises AppError(400) if the sale quantity exceeds available stock.
+
+    Uses SELECT … FOR UPDATE to lock the row and prevent concurrent oversells.
     """
-    stmt = select(StoreInventory).where(StoreInventory.id == inventory_id)
+    stmt = (
+        select(StoreInventory)
+        .where(
+            and_(StoreInventory.id == inventory_id, StoreInventory.store_id == store_id)
+        )
+        .with_for_update()
+    )
     result = await db.execute(stmt)
     inventory = result.scalars().first()
     if not inventory:
-        raise NotFound(f"Inventory entry {inventory_id} not found")
+        raise NotFound(f"Inventory entry {inventory_id} not found in store {store_id}")
 
     if inventory.quantity < data.quantity:
         raise AppError(

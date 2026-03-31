@@ -83,4 +83,4 @@ def downgrade() -> None:
         table_name="inventory_movements",
     )
     op.drop_table("inventory_movements")
-    op.execute("DROP TYPE movement_type")
+    op.execute("DROP TYPE IF EXISTS movement_type")
