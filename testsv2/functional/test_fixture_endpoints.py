@@ -1,11 +1,11 @@
 """
-Functional tests for the zone routes.
+Functional tests for the fixture routes.
 
-  POST   /api/stores/{store_id}/layouts/{layout_version_id}/zones
-  GET    /api/stores/{store_id}/layouts/{layout_version_id}/zones
-  GET    /api/stores/{store_id}/layouts/{layout_version_id}/zones/{zone_id}
-  PUT    /api/stores/{store_id}/layouts/{layout_version_id}/zones/{zone_id}
-  DELETE /api/stores/{store_id}/layouts/{layout_version_id}/zones/{zone_id}
+  POST   /api/stores/{store_id}/layouts/{layout_version_id}/fixtures
+  GET    /api/stores/{store_id}/layouts/{layout_version_id}/fixtures
+  GET    /api/stores/{store_id}/layouts/{layout_version_id}/fixtures/{fixture_id}
+  PUT    /api/stores/{store_id}/layouts/{layout_version_id}/fixtures/{fixture_id}
+  DELETE /api/stores/{store_id}/layouts/{layout_version_id}/fixtures/{fixture_id}
 """
 
 import uuid
@@ -15,8 +15,10 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.roles import OrgRole
+from app.models.fixture import FixtureType
 from app.models.user import User
 from testsv2.factories import (
+    create_fixture,
     create_layout_version,
     create_membership,
     create_org,
@@ -32,24 +34,24 @@ def _org_headers(org_id) -> dict:
     return {**AUTH_HEADER, "X-Org-Id": str(org_id)}
 
 
-def _zones_url(store_id, layout_version_id) -> str:
-    return f"/api/stores/{store_id}/layouts/{layout_version_id}/zones"
+def _fixtures_url(store_id, layout_version_id) -> str:
+    return f"/api/stores/{store_id}/layouts/{layout_version_id}/fixtures"
 
 
-def _zone_url(store_id, layout_version_id, zone_id) -> str:
-    return f"/api/stores/{store_id}/layouts/{layout_version_id}/zones/{zone_id}"
+def _fixture_url(store_id, layout_version_id, fixture_id) -> str:
+    return f"/api/stores/{store_id}/layouts/{layout_version_id}/fixtures/{fixture_id}"
 
 
-# ── POST – create zone ────────────────────────────────────────────────────────
+# ── POST – create fixture ─────────────────────────────────────────────────────
 
 
 @pytest.mark.usefixtures("bypass_auth")
-async def test_create_zone_returns_201(
+async def test_create_fixture_returns_201(
     client: AsyncClient,
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """Owner can create a zone; response is 201 with correct payload."""
+    """Owner can create a fixture; response is 201 with correct payload."""
     org = await create_org(db)
     await create_membership(
         db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
@@ -60,21 +62,77 @@ async def test_create_zone_returns_201(
     )
 
     response = await client.post(
-        _zones_url(store.id, layout.id),
-        json={"name": "Zone A", "color": "#FF0000", "cells": [{"row": 0, "col": 0}]},
+        _fixtures_url(store.id, layout.id),
+        json={"fixture_type": "WALL", "cells": [{"row": 0, "col": 0}]},
         headers=_org_headers(org.id),
     )
 
     assert response.status_code == 201
     body = response.json()
-    assert body["name"] == "Zone A"
-    assert body["color"] == "#FF0000"
+    assert body["fixture_type"] == "WALL"
+    assert body["name"] is None
     assert body["cells"] == [{"row": 0, "col": 0}]
     assert body["layout_version_id"] == str(layout.id)
 
 
 @pytest.mark.usefixtures("bypass_auth")
-async def test_create_zone_rejects_cell_outside_grid_bounds(
+async def test_create_fixture_with_name_returns_201(
+    client: AsyncClient,
+    db: AsyncSession,
+    test_user: User,
+) -> None:
+    """Owner can optionally supply a name."""
+    org = await create_org(db)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
+    store = await create_store(db, org_id=org.id)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
+
+    response = await client.post(
+        _fixtures_url(store.id, layout.id),
+        json={
+            "fixture_type": "CHECKOUT",
+            "name": "Main Checkout",
+            "cells": [{"row": 1, "col": 1}],
+        },
+        headers=_org_headers(org.id),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["name"] == "Main Checkout"
+    assert response.json()["fixture_type"] == "CHECKOUT"
+
+
+@pytest.mark.usefixtures("bypass_auth")
+async def test_create_fixture_invalid_type_returns_422(
+    client: AsyncClient,
+    db: AsyncSession,
+    test_user: User,
+) -> None:
+    """An invalid fixture_type enum value returns 422."""
+    org = await create_org(db)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
+    store = await create_store(db, org_id=org.id)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
+
+    response = await client.post(
+        _fixtures_url(store.id, layout.id),
+        json={"fixture_type": "NOT_A_TYPE", "cells": [{"row": 0, "col": 0}]},
+        headers=_org_headers(org.id),
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.usefixtures("bypass_auth")
+async def test_create_fixture_rejects_cell_outside_grid_bounds(
     client: AsyncClient,
     db: AsyncSession,
     test_user: User,
@@ -90,8 +148,8 @@ async def test_create_zone_rejects_cell_outside_grid_bounds(
     )
 
     response = await client.post(
-        _zones_url(store.id, layout.id),
-        json={"name": "OOB Zone", "color": "#0000FF", "cells": [{"row": 3, "col": 0}]},
+        _fixtures_url(store.id, layout.id),
+        json={"fixture_type": "WALL", "cells": [{"row": 3, "col": 0}]},
         headers=_org_headers(org.id),
     )
 
@@ -99,37 +157,12 @@ async def test_create_zone_rejects_cell_outside_grid_bounds(
 
 
 @pytest.mark.usefixtures("bypass_auth")
-async def test_create_zone_rejects_cell_col_outside_bounds(
+async def test_create_fixture_overlaps_existing_fixture_returns_409(
     client: AsyncClient,
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """A cell with col >= layout.cols returns 400."""
-    org = await create_org(db)
-    await create_membership(
-        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
-    )
-    store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(
-        db, store_id=store.id, rows=3, cols=3, version_number=1
-    )
-
-    response = await client.post(
-        _zones_url(store.id, layout.id),
-        json={"name": "OOB Zone", "color": "#0000FF", "cells": [{"row": 0, "col": 3}]},
-        headers=_org_headers(org.id),
-    )
-
-    assert response.status_code == 400
-
-
-@pytest.mark.usefixtures("bypass_auth")
-async def test_create_zone_rejects_overlapping_cells(
-    client: AsyncClient,
-    db: AsyncSession,
-    test_user: User,
-) -> None:
-    """Creating a zone with cells occupied by another zone returns 409."""
+    """Cells overlapping an existing fixture return 409."""
     org = await create_org(db)
     await create_membership(
         db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
@@ -138,21 +171,11 @@ async def test_create_zone_rejects_overlapping_cells(
     layout = await create_layout_version(
         db, store_id=store.id, rows=5, cols=5, version_number=1
     )
-    await create_zone(
-        db,
-        layout_version_id=layout.id,
-        name="Zone A",
-        color="#FF0000",
-        cells=[{"row": 0, "col": 0}, {"row": 0, "col": 1}],
-    )
+    await create_fixture(db, layout_version_id=layout.id, cells=[{"row": 2, "col": 2}])
 
     response = await client.post(
-        _zones_url(store.id, layout.id),
-        json={
-            "name": "Zone B",
-            "color": "#00FF00",
-            "cells": [{"row": 0, "col": 0}],
-        },
+        _fixtures_url(store.id, layout.id),
+        json={"fixture_type": "DOOR", "cells": [{"row": 2, "col": 2}]},
         headers=_org_headers(org.id),
     )
 
@@ -160,12 +183,38 @@ async def test_create_zone_rejects_overlapping_cells(
 
 
 @pytest.mark.usefixtures("bypass_auth")
-async def test_create_zone_rejects_duplicate_cells_in_request(
+async def test_create_fixture_overlaps_existing_zone_returns_409(
     client: AsyncClient,
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """Providing duplicate cells within the same request body returns 422."""
+    """Cells overlapping an existing zone return 409."""
+    org = await create_org(db)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
+    store = await create_store(db, org_id=org.id)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
+    await create_zone(db, layout_version_id=layout.id, cells=[{"row": 1, "col": 1}])
+
+    response = await client.post(
+        _fixtures_url(store.id, layout.id),
+        json={"fixture_type": "PILLAR", "cells": [{"row": 1, "col": 1}]},
+        headers=_org_headers(org.id),
+    )
+
+    assert response.status_code == 409
+
+
+@pytest.mark.usefixtures("bypass_auth")
+async def test_create_fixture_duplicate_cells_in_request_returns_422(
+    client: AsyncClient,
+    db: AsyncSession,
+    test_user: User,
+) -> None:
+    """Duplicate cells in the same request return 422."""
     org = await create_org(db)
     await create_membership(
         db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
@@ -176,10 +225,9 @@ async def test_create_zone_rejects_duplicate_cells_in_request(
     )
 
     response = await client.post(
-        _zones_url(store.id, layout.id),
+        _fixtures_url(store.id, layout.id),
         json={
-            "name": "Zone A",
-            "color": "#FF0000",
+            "fixture_type": "WALL",
             "cells": [{"row": 0, "col": 0}, {"row": 0, "col": 0}],
         },
         headers=_org_headers(org.id),
@@ -189,12 +237,12 @@ async def test_create_zone_rejects_duplicate_cells_in_request(
 
 
 @pytest.mark.usefixtures("bypass_auth")
-async def test_create_zone_rejects_zero_cells(
+async def test_create_fixture_empty_cells_returns_422(
     client: AsyncClient,
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """Providing an empty cells list returns 422."""
+    """An empty cells list returns 422."""
     org = await create_org(db)
     await create_membership(
         db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
@@ -205,8 +253,8 @@ async def test_create_zone_rejects_zero_cells(
     )
 
     response = await client.post(
-        _zones_url(store.id, layout.id),
-        json={"name": "Zone A", "color": "#FF0000", "cells": []},
+        _fixtures_url(store.id, layout.id),
+        json={"fixture_type": "WALL", "cells": []},
         headers=_org_headers(org.id),
     )
 
@@ -214,12 +262,12 @@ async def test_create_zone_rejects_zero_cells(
 
 
 @pytest.mark.usefixtures("bypass_auth")
-async def test_create_zone_viewer_forbidden(
+async def test_create_fixture_employee_forbidden(
     client: AsyncClient,
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """A user with EMPLOYEE role cannot create zones (403)."""
+    """An EMPLOYEE role cannot create fixtures (403)."""
     org = await create_org(db)
     await create_membership(
         db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE
@@ -230,67 +278,63 @@ async def test_create_zone_viewer_forbidden(
     )
 
     response = await client.post(
-        _zones_url(store.id, layout.id),
-        json={"name": "Zone A", "color": "#FF0000", "cells": [{"row": 0, "col": 0}]},
+        _fixtures_url(store.id, layout.id),
+        json={"fixture_type": "WALL", "cells": [{"row": 0, "col": 0}]},
         headers=_org_headers(org.id),
     )
 
     assert response.status_code == 403
 
 
-# ── GET – list zones ──────────────────────────────────────────────────────────
+# ── GET list ─────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.usefixtures("bypass_auth")
-async def test_list_zones_returns_ordered_by_created_at(
+async def test_list_fixtures_returns_all_ordered_by_created_at(
     client: AsyncClient,
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """List returns all zones; same-transaction rows share created_at so we verify set membership."""
+    """List endpoint returns all fixtures; same-transaction rows share created_at so we verify set membership."""
     org = await create_org(db)
     await create_membership(
-        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE
     )
     store = await create_store(db, org_id=org.id)
     layout = await create_layout_version(
         db, store_id=store.id, rows=5, cols=5, version_number=1
     )
-    await create_zone(
-        db,
-        layout_version_id=layout.id,
-        name="Zone A",
-        color="#FF0000",
-        cells=[{"row": 0, "col": 0}],
+
+    f1 = await create_fixture(
+        db, layout_version_id=layout.id, cells=[{"row": 0, "col": 0}]
     )
-    await create_zone(
+    f2 = await create_fixture(
         db,
         layout_version_id=layout.id,
-        name="Zone B",
-        color="#00FF00",
-        cells=[{"row": 1, "col": 0}],
+        fixture_type=FixtureType.DOOR,
+        cells=[{"row": 1, "col": 1}],
     )
 
     response = await client.get(
-        _zones_url(store.id, layout.id),
+        _fixtures_url(store.id, layout.id),
         headers=_org_headers(org.id),
     )
 
     assert response.status_code == 200
-    names = [z["name"] for z in response.json()]
-    assert set(names) == {"Zone A", "Zone B"}
+    ids = [item["id"] for item in response.json()]
+    assert set(ids) == {str(f1.id), str(f2.id)}
 
 
 @pytest.mark.usefixtures("bypass_auth")
-async def test_list_zones_empty_returns_empty_list(
+async def test_list_fixtures_empty(
     client: AsyncClient,
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """List returns an empty array when no zones exist."""
+    """List endpoint returns an empty list when no fixtures exist."""
     org = await create_org(db)
     await create_membership(
-        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE
     )
     store = await create_store(db, org_id=org.id)
     layout = await create_layout_version(
@@ -298,7 +342,7 @@ async def test_list_zones_empty_returns_empty_list(
     )
 
     response = await client.get(
-        _zones_url(store.id, layout.id),
+        _fixtures_url(store.id, layout.id),
         headers=_org_headers(org.id),
     )
 
@@ -306,47 +350,46 @@ async def test_list_zones_empty_returns_empty_list(
     assert response.json() == []
 
 
-# ── GET – single zone ─────────────────────────────────────────────────────────
+# ── GET single ───────────────────────────────────────────────────────────────
 
 
 @pytest.mark.usefixtures("bypass_auth")
-async def test_get_zone_returns_200(
+async def test_get_fixture_returns_200(
     client: AsyncClient,
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """GET /{zone_id} returns the zone."""
+    """Any org member can fetch a fixture by ID."""
     org = await create_org(db)
     await create_membership(
-        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE
     )
     store = await create_store(db, org_id=org.id)
     layout = await create_layout_version(
         db, store_id=store.id, rows=5, cols=5, version_number=1
     )
-    zone = await create_zone(
-        db, layout_version_id=layout.id, name="Zone A", color="#FF0000"
-    )
+    fixture = await create_fixture(db, layout_version_id=layout.id, name="North Wall")
 
     response = await client.get(
-        _zone_url(store.id, layout.id, zone.id),
+        _fixture_url(store.id, layout.id, fixture.id),
         headers=_org_headers(org.id),
     )
 
     assert response.status_code == 200
-    assert response.json()["id"] == str(zone.id)
+    assert response.json()["id"] == str(fixture.id)
+    assert response.json()["name"] == "North Wall"
 
 
 @pytest.mark.usefixtures("bypass_auth")
-async def test_get_zone_returns_404_for_unknown(
+async def test_get_fixture_unknown_id_returns_404(
     client: AsyncClient,
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """GET with unknown zone_id returns 404."""
+    """Fetching a non-existent fixture ID returns 404."""
     org = await create_org(db)
     await create_membership(
-        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE
     )
     store = await create_store(db, org_id=org.id)
     layout = await create_layout_version(
@@ -354,23 +397,23 @@ async def test_get_zone_returns_404_for_unknown(
     )
 
     response = await client.get(
-        _zone_url(store.id, layout.id, uuid.uuid4()),
+        _fixture_url(store.id, layout.id, uuid.uuid4()),
         headers=_org_headers(org.id),
     )
 
     assert response.status_code == 404
 
 
-# ── PUT – update zone ─────────────────────────────────────────────────────────
+# ── PUT – update fixture ──────────────────────────────────────────────────────
 
 
 @pytest.mark.usefixtures("bypass_auth")
-async def test_update_zone_name_and_color(
+async def test_update_fixture_type_and_name(
     client: AsyncClient,
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """PUT updates name and color; cells unchanged."""
+    """Owner can update fixture_type and name."""
     org = await create_org(db)
     await create_membership(
         db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
@@ -379,29 +422,28 @@ async def test_update_zone_name_and_color(
     layout = await create_layout_version(
         db, store_id=store.id, rows=5, cols=5, version_number=1
     )
-    zone = await create_zone(
-        db, layout_version_id=layout.id, name="Zone A", color="#FF0000"
+    fixture = await create_fixture(
+        db, layout_version_id=layout.id, cells=[{"row": 0, "col": 0}]
     )
 
     response = await client.put(
-        _zone_url(store.id, layout.id, zone.id),
-        json={"name": "Updated Zone", "color": "#0000FF"},
+        _fixture_url(store.id, layout.id, fixture.id),
+        json={"fixture_type": "CHECKOUT", "name": "Self Checkout"},
         headers=_org_headers(org.id),
     )
 
     assert response.status_code == 200
-    body = response.json()
-    assert body["name"] == "Updated Zone"
-    assert body["color"] == "#0000FF"
+    assert response.json()["fixture_type"] == "CHECKOUT"
+    assert response.json()["name"] == "Self Checkout"
 
 
 @pytest.mark.usefixtures("bypass_auth")
-async def test_update_zone_cells(
+async def test_update_fixture_cells(
     client: AsyncClient,
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """PUT updates cells when provided."""
+    """Owner can replace cells on a fixture."""
     org = await create_org(db)
     await create_membership(
         db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
@@ -410,31 +452,27 @@ async def test_update_zone_cells(
     layout = await create_layout_version(
         db, store_id=store.id, rows=5, cols=5, version_number=1
     )
-    zone = await create_zone(
-        db,
-        layout_version_id=layout.id,
-        name="Zone A",
-        color="#FF0000",
-        cells=[{"row": 0, "col": 0}],
+    fixture = await create_fixture(
+        db, layout_version_id=layout.id, cells=[{"row": 0, "col": 0}]
     )
 
     response = await client.put(
-        _zone_url(store.id, layout.id, zone.id),
-        json={"cells": [{"row": 2, "col": 2}, {"row": 2, "col": 3}]},
+        _fixture_url(store.id, layout.id, fixture.id),
+        json={"cells": [{"row": 2, "col": 2}]},
         headers=_org_headers(org.id),
     )
 
     assert response.status_code == 200
-    assert response.json()["cells"] == [{"row": 2, "col": 2}, {"row": 2, "col": 3}]
+    assert response.json()["cells"] == [{"row": 2, "col": 2}]
 
 
 @pytest.mark.usefixtures("bypass_auth")
-async def test_update_zone_cells_overlap_rejected(
+async def test_update_fixture_overlap_rejected(
     client: AsyncClient,
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """Updating cells to overlap another zone returns 409."""
+    """Updating fixture cells to overlap another fixture returns 409."""
     org = await create_org(db)
     await create_membership(
         db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
@@ -443,24 +481,22 @@ async def test_update_zone_cells_overlap_rejected(
     layout = await create_layout_version(
         db, store_id=store.id, rows=5, cols=5, version_number=1
     )
-    await create_zone(
+    await create_fixture(
         db,
         layout_version_id=layout.id,
-        name="Zone A",
-        color="#FF0000",
-        cells=[{"row": 0, "col": 0}],
+        fixture_type=FixtureType.WALL,
+        cells=[{"row": 3, "col": 3}],
     )
-    zone_b = await create_zone(
+    fixture2 = await create_fixture(
         db,
         layout_version_id=layout.id,
-        name="Zone B",
-        color="#00FF00",
-        cells=[{"row": 1, "col": 0}],
+        fixture_type=FixtureType.DOOR,
+        cells=[{"row": 4, "col": 4}],
     )
 
     response = await client.put(
-        _zone_url(store.id, layout.id, zone_b.id),
-        json={"cells": [{"row": 0, "col": 0}]},
+        _fixture_url(store.id, layout.id, fixture2.id),
+        json={"cells": [{"row": 3, "col": 3}]},
         headers=_org_headers(org.id),
     )
 
@@ -471,12 +507,12 @@ async def test_update_zone_cells_overlap_rejected(
 
 
 @pytest.mark.usefixtures("bypass_auth")
-async def test_delete_zone_returns_204(
+async def test_delete_fixture_returns_204(
     client: AsyncClient,
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """DELETE returns 204 and the zone is no longer retrievable."""
+    """Owner can delete a fixture; subsequent GET returns 404."""
     org = await create_org(db)
     await create_membership(
         db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
@@ -485,32 +521,29 @@ async def test_delete_zone_returns_204(
     layout = await create_layout_version(
         db, store_id=store.id, rows=5, cols=5, version_number=1
     )
-    zone = await create_zone(
-        db, layout_version_id=layout.id, name="Zone A", color="#FF0000"
-    )
+    fixture = await create_fixture(db, layout_version_id=layout.id)
 
     response = await client.delete(
-        _zone_url(store.id, layout.id, zone.id),
+        _fixture_url(store.id, layout.id, fixture.id),
         headers=_org_headers(org.id),
     )
 
     assert response.status_code == 204
 
-    # Confirm it is gone
     get_response = await client.get(
-        _zone_url(store.id, layout.id, zone.id),
+        _fixture_url(store.id, layout.id, fixture.id),
         headers=_org_headers(org.id),
     )
     assert get_response.status_code == 404
 
 
 @pytest.mark.usefixtures("bypass_auth")
-async def test_delete_zone_unknown_returns_404(
+async def test_delete_fixture_unknown_id_returns_404(
     client: AsyncClient,
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """DELETE with an unknown zone_id returns 404."""
+    """Deleting a non-existent fixture ID returns 404."""
     org = await create_org(db)
     await create_membership(
         db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
@@ -521,36 +554,68 @@ async def test_delete_zone_unknown_returns_404(
     )
 
     response = await client.delete(
-        _zone_url(store.id, layout.id, uuid.uuid4()),
+        _fixture_url(store.id, layout.id, uuid.uuid4()),
         headers=_org_headers(org.id),
     )
 
     assert response.status_code == 404
 
 
-# ── Zones appear in GET /layouts/active ───────────────────────────────────────
+# ── Zone overlap check (BE-08 TODO resolved) ─────────────────────────────────
 
 
 @pytest.mark.usefixtures("bypass_auth")
-async def test_zones_visible_in_active_layout(
+async def test_create_zone_overlapping_fixture_returns_409(
     client: AsyncClient,
     db: AsyncSession,
     test_user: User,
 ) -> None:
-    """Zones created in the active layout are included in GET /active."""
+    """Creating a zone whose cells overlap an existing fixture returns 409."""
     org = await create_org(db)
     await create_membership(
         db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
     )
     store = await create_store(db, org_id=org.id)
     layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
+    await create_fixture(db, layout_version_id=layout.id, cells=[{"row": 2, "col": 2}])
+
+    response = await client.post(
+        f"/api/stores/{store.id}/layouts/{layout.id}/zones",
+        json={
+            "name": "Conflict Zone",
+            "color": "#00FF00",
+            "cells": [{"row": 2, "col": 2}],
+        },
+        headers=_org_headers(org.id),
+    )
+
+    assert response.status_code == 409
+
+
+# ── Integration: fixtures appear in active layout response ────────────────────
+
+
+@pytest.mark.usefixtures("bypass_auth")
+async def test_fixtures_appear_in_active_layout_response(
+    client: AsyncClient,
+    db: AsyncSession,
+    test_user: User,
+) -> None:
+    """Fixtures are included in the GET /layouts/active response payload."""
+    org = await create_org(db)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE
+    )
+    store = await create_store(db, org_id=org.id)
+    layout = await create_layout_version(
         db, store_id=store.id, rows=5, cols=5, version_number=1, is_active=True
     )
-    await create_zone(
+    fixture = await create_fixture(
         db,
         layout_version_id=layout.id,
-        name="Zone A",
-        color="#FF0000",
+        fixture_type=FixtureType.STAIRS,
         cells=[{"row": 0, "col": 0}],
     )
 
@@ -560,6 +625,5 @@ async def test_zones_visible_in_active_layout(
     )
 
     assert response.status_code == 200
-    body = response.json()
-    assert len(body["zones"]) == 1
-    assert body["zones"][0]["name"] == "Zone A"
+    fixture_ids = [f["id"] for f in response.json()["fixtures"]]
+    assert str(fixture.id) in fixture_ids
