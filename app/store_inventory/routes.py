@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -12,6 +12,7 @@ from app.models.store import Store
 from app.orgs.deps import RequireOrgRole
 from app.stores.deps import get_store_from_path
 from app.store_inventory.schemas import (
+    PaginatedInventoryResponse,
     StoreInventoryCreate,
     StoreInventoryRead,
     StoreInventoryUpdate,
@@ -52,13 +53,36 @@ async def stock_product(
     return entry
 
 
-@router.get("", response_model=list[StoreInventoryRead])
+@router.get("", response_model=PaginatedInventoryResponse)
 async def get_store_inventory(
     store: Store = Depends(get_store_from_path),
     db: AsyncSession = Depends(get_db),
-) -> list[StoreInventory]:
-    """List all inventory entries for this store."""
-    return await list_inventory(db, store_id=store.id)
+    search: str | None = Query(
+        default=None,
+        description="Case-insensitive partial match on product name or category.",
+    ),
+    category: str | None = Query(
+        default=None,
+        description="Case-insensitive partial match on product category.",
+    ),
+    page: int = Query(default=1, ge=1, description="1-based page number."),
+    page_size: int = Query(default=20, ge=1, le=100, description="Items per page."),
+) -> PaginatedInventoryResponse:
+    """List inventory entries for this store with optional search, category filter, and pagination."""
+    items, total = await list_inventory(
+        db,
+        store_id=store.id,
+        search=search,
+        category=category,
+        page=page,
+        page_size=page_size,
+    )
+    return PaginatedInventoryResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.get("/{entry_id}", response_model=StoreInventoryRead)
