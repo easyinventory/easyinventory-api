@@ -17,6 +17,47 @@ if TYPE_CHECKING:
     from app.models.zone import Zone
 
 
+def compute_duration_display(
+    started_at: datetime, ended_at: datetime | None
+) -> str | None:
+    """
+    Return a human-readable string for how long an item was in a zone.
+
+    Returns ``None`` when the placement is still active (``ended_at`` is
+    ``None``).  Otherwise returns one of the forms below:
+
+    - ``"2 days, 3 hrs"``   — duration >= 1 day
+    - ``"1 hr, 30 mins"``   — duration >= 1 hour but < 1 day
+    - ``"45 mins"``          — duration >= 1 minute but < 1 hour
+    - ``"< 1 min"``          — duration < 1 minute
+    """
+    if ended_at is None:
+        return None
+
+    delta = ended_at - started_at
+    total_seconds = max(int(delta.total_seconds()), 0)
+
+    days = total_seconds // 86400
+    hours = (total_seconds % 86400) // 3600
+    minutes = (total_seconds % 3600) // 60
+
+    if days > 0:
+        day_label = "day" if days == 1 else "days"
+        hr_label = "hr" if hours == 1 else "hrs"
+        return f"{days} {day_label}, {hours} {hr_label}"
+
+    if hours > 0:
+        hr_label = "hr" if hours == 1 else "hrs"
+        min_label = "min" if minutes == 1 else "mins"
+        return f"{hours} {hr_label}, {minutes} {min_label}"
+
+    if minutes > 0:
+        min_label = "min" if minutes == 1 else "mins"
+        return f"{minutes} {min_label}"
+
+    return "< 1 min"
+
+
 class InventoryPlacement(BaseModel):
     """
     Records that a store inventory item was placed in a specific zone.
@@ -80,28 +121,4 @@ class InventoryPlacement(BaseModel):
         - ``"12 mins"`` when the duration is less than one hour
         - ``"< 1 min"`` when the duration is less than one minute
         """
-        if self.ended_at is None:
-            return None
-
-        delta = self.ended_at - self.created_at
-        total_seconds = max(int(delta.total_seconds()), 0)
-
-        days = total_seconds // 86400
-        hours = (total_seconds % 86400) // 3600
-        minutes = (total_seconds % 3600) // 60
-
-        if days > 0:
-            day_label = "day" if days == 1 else "days"
-            hr_label = "hr" if hours == 1 else "hrs"
-            return f"{days} {day_label}, {hours} {hr_label}"
-
-        if hours > 0:
-            hr_label = "hr" if hours == 1 else "hrs"
-            min_label = "min" if minutes == 1 else "mins"
-            return f"{hours} {hr_label}, {minutes} {min_label}"
-
-        if minutes > 0:
-            min_label = "min" if minutes == 1 else "mins"
-            return f"{minutes} {min_label}"
-
-        return "< 1 min"
+        return compute_duration_display(self.created_at, self.ended_at)
