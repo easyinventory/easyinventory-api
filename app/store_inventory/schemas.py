@@ -105,3 +105,33 @@ class MovementRead(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# ── Placement schemas ─────────────────────────────────────────────────────────
+
+
+class AssignZoneRequest(BaseModel):
+    """Request body for PATCH …/placements — assign an inventory item to a zone."""
+
+    active_zone_id: uuid.UUID
+
+
+class PlacementRead(BaseModel):
+    """
+    Schema for reading an inventory placement record.
+
+    ``zone_name`` and ``duration_display`` are computed properties on the ORM
+    model and are surfaced here via ``from_attributes = True``.
+    """
+
+    id: uuid.UUID
+    store_inventory_id: uuid.UUID
+    zone_id: uuid.UUID
+    zone_name: str
+    started_at: datetime
+    ended_at: datetime | None
+    placed_by_user_id: uuid.UUID
+    duration_display: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
