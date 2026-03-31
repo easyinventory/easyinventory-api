@@ -11,6 +11,7 @@ from app.core.database import get_db
 from app.core.roles import OrgRole
 from app.layouts.deps import get_layout_from_path
 from app.models.layout_version import LayoutVersion
+from app.models.zone import Zone
 from app.orgs.deps import RequireOrgRole
 from app.zones.schemas import ZoneCreate, ZoneRead, ZoneUpdate
 from app.zones import service
@@ -27,10 +28,10 @@ router = APIRouter(
 async def list_zones(
     db: AsyncSession = Depends(get_db),
     layout: LayoutVersion = Depends(get_layout_from_path),
-) -> list[ZoneRead]:
+) -> list[Zone]:
     """Return all zones for the layout version ordered by creation date."""
     zones = await service.list_zones(db, layout.id)
-    return [ZoneRead.model_validate(z) for z in zones]
+    return zones
 
 
 @router.get("/{zone_id}", response_model=ZoneRead)
@@ -38,10 +39,10 @@ async def get_zone(
     zone_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     layout: LayoutVersion = Depends(get_layout_from_path),
-) -> ZoneRead:
+) -> Zone:
     """Return a single zone by ID."""
     zone = await service.get_zone(db, zone_id, layout.id)
-    return ZoneRead.model_validate(zone)
+    return zone
 
 
 # ── Write endpoints (OWNER or ADMIN only) ─────────────────────────────────────
@@ -53,14 +54,14 @@ async def create_zone(
     db: AsyncSession = Depends(get_db),
     layout: LayoutVersion = Depends(get_layout_from_path),
     _: object = Depends(RequireOrgRole(OrgRole.OWNER, OrgRole.ADMIN)),
-) -> ZoneRead:
+) -> Zone:
     """
     Create a new zone within a layout version.
 
     All cells must lie within the layout grid and must not overlap existing zones.
     """
     zone = await service.create_zone(db, layout.id, data)
-    return ZoneRead.model_validate(zone)
+    return zone
 
 
 @router.put("/{zone_id}", response_model=ZoneRead)
@@ -70,10 +71,10 @@ async def update_zone(
     db: AsyncSession = Depends(get_db),
     layout: LayoutVersion = Depends(get_layout_from_path),
     _: object = Depends(RequireOrgRole(OrgRole.OWNER, OrgRole.ADMIN)),
-) -> ZoneRead:
+) -> Zone:
     """Partially update a zone's name, color, and/or cells."""
     zone = await service.update_zone(db, zone_id, layout.id, data)
-    return ZoneRead.model_validate(zone)
+    return zone
 
 
 @router.delete("/{zone_id}", status_code=status.HTTP_204_NO_CONTENT)
