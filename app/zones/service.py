@@ -71,10 +71,16 @@ async def _check_zone_overlap(
         select(Fixture).where(Fixture.layout_version_id == layout_version_id)
     )
     for fixture in fixture_result.scalars().all():
-        fixture_cells: set[tuple[int, int]] = {(c["row"], c["col"]) for c in fixture.cells}
+        fixture_cells: set[tuple[int, int]] = {
+            (c["row"], c["col"]) for c in fixture.cells
+        }
         overlap = requested & fixture_cells
         if overlap:
-            label = f"fixture '{fixture.name}'" if fixture.name else f"a {fixture.fixture_type.value} fixture"
+            label = (
+                f"fixture '{fixture.name}'"
+                if fixture.name
+                else f"a {fixture.fixture_type.value} fixture"
+            )
             raise AppError(
                 f"Cells {sorted(overlap)} overlap with existing {label}",
                 status_code=409,

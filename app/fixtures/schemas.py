@@ -36,7 +36,9 @@ class FixtureUpdate(BaseModel):
 
     @field_validator("cells")
     @classmethod
-    def no_duplicate_cells(cls, v: Optional[list[CellPosition]]) -> Optional[list[CellPosition]]:
+    def no_duplicate_cells(
+        cls, v: Optional[list[CellPosition]]
+    ) -> Optional[list[CellPosition]]:
         if v is None:
             return v
         seen: set[tuple[int, int]] = set()

@@ -59,10 +59,16 @@ async def _check_overlap(
     for fixture in fixture_result.scalars().all():
         if exclude_fixture_id and fixture.id == exclude_fixture_id:
             continue
-        fixture_cells: set[tuple[int, int]] = {(c["row"], c["col"]) for c in fixture.cells}
+        fixture_cells: set[tuple[int, int]] = {
+            (c["row"], c["col"]) for c in fixture.cells
+        }
         overlap = requested & fixture_cells
         if overlap:
-            label = f"fixture '{fixture.name}'" if fixture.name else f"a {fixture.fixture_type.value} fixture"
+            label = (
+                f"fixture '{fixture.name}'"
+                if fixture.name
+                else f"a {fixture.fixture_type.value} fixture"
+            )
             raise AppError(
                 f"Cells {sorted(overlap)} overlap with existing {label}",
                 status_code=409,
@@ -162,7 +168,9 @@ async def update_fixture(
         layout = await _get_layout(db, layout_version_id)
         cells = [{"row": c.row, "col": c.col} for c in data.cells]
         _check_bounds(layout, cells)
-        await _check_overlap(db, layout_version_id, cells, exclude_fixture_id=fixture_id)
+        await _check_overlap(
+            db, layout_version_id, cells, exclude_fixture_id=fixture_id
+        )
         fixture.cells = cells
 
     if data.fixture_type is not None:

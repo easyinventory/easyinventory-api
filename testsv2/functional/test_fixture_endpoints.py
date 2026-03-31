@@ -53,9 +53,13 @@ async def test_create_fixture_returns_201(
 ) -> None:
     """Owner can create a fixture; response is 201 with correct payload."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=5, cols=5, version_number=1)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
 
     response = await client.post(
         _fixtures_url(store.id, layout.id),
@@ -79,13 +83,21 @@ async def test_create_fixture_with_name_returns_201(
 ) -> None:
     """Owner can optionally supply a name."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=5, cols=5, version_number=1)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
 
     response = await client.post(
         _fixtures_url(store.id, layout.id),
-        json={"fixture_type": "CHECKOUT", "name": "Main Checkout", "cells": [{"row": 1, "col": 1}]},
+        json={
+            "fixture_type": "CHECKOUT",
+            "name": "Main Checkout",
+            "cells": [{"row": 1, "col": 1}],
+        },
         headers=_org_headers(org.id),
     )
 
@@ -102,9 +114,13 @@ async def test_create_fixture_invalid_type_returns_422(
 ) -> None:
     """An invalid fixture_type enum value returns 422."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=5, cols=5, version_number=1)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
 
     response = await client.post(
         _fixtures_url(store.id, layout.id),
@@ -123,9 +139,13 @@ async def test_create_fixture_rejects_cell_outside_grid_bounds(
 ) -> None:
     """A cell outside the grid dimensions returns 400."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=3, cols=3, version_number=1)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=3, cols=3, version_number=1
+    )
 
     response = await client.post(
         _fixtures_url(store.id, layout.id),
@@ -144,9 +164,13 @@ async def test_create_fixture_overlaps_existing_fixture_returns_409(
 ) -> None:
     """Cells overlapping an existing fixture return 409."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=5, cols=5, version_number=1)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
     await create_fixture(db, layout_version_id=layout.id, cells=[{"row": 2, "col": 2}])
 
     response = await client.post(
@@ -166,9 +190,13 @@ async def test_create_fixture_overlaps_existing_zone_returns_409(
 ) -> None:
     """Cells overlapping an existing zone return 409."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=5, cols=5, version_number=1)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
     await create_zone(db, layout_version_id=layout.id, cells=[{"row": 1, "col": 1}])
 
     response = await client.post(
@@ -188,13 +216,20 @@ async def test_create_fixture_duplicate_cells_in_request_returns_422(
 ) -> None:
     """Duplicate cells in the same request return 422."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=5, cols=5, version_number=1)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
 
     response = await client.post(
         _fixtures_url(store.id, layout.id),
-        json={"fixture_type": "WALL", "cells": [{"row": 0, "col": 0}, {"row": 0, "col": 0}]},
+        json={
+            "fixture_type": "WALL",
+            "cells": [{"row": 0, "col": 0}, {"row": 0, "col": 0}],
+        },
         headers=_org_headers(org.id),
     )
 
@@ -209,9 +244,13 @@ async def test_create_fixture_empty_cells_returns_422(
 ) -> None:
     """An empty cells list returns 422."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=5, cols=5, version_number=1)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
 
     response = await client.post(
         _fixtures_url(store.id, layout.id),
@@ -230,9 +269,13 @@ async def test_create_fixture_employee_forbidden(
 ) -> None:
     """An EMPLOYEE role cannot create fixtures (403)."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=5, cols=5, version_number=1)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
 
     response = await client.post(
         _fixtures_url(store.id, layout.id),
@@ -254,12 +297,23 @@ async def test_list_fixtures_returns_all_ordered_by_created_at(
 ) -> None:
     """List endpoint returns fixtures ordered by creation date."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=5, cols=5, version_number=1)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
 
-    f1 = await create_fixture(db, layout_version_id=layout.id, cells=[{"row": 0, "col": 0}])
-    f2 = await create_fixture(db, layout_version_id=layout.id, fixture_type=FixtureType.DOOR, cells=[{"row": 1, "col": 1}])
+    f1 = await create_fixture(
+        db, layout_version_id=layout.id, cells=[{"row": 0, "col": 0}]
+    )
+    f2 = await create_fixture(
+        db,
+        layout_version_id=layout.id,
+        fixture_type=FixtureType.DOOR,
+        cells=[{"row": 1, "col": 1}],
+    )
 
     response = await client.get(
         _fixtures_url(store.id, layout.id),
@@ -279,9 +333,13 @@ async def test_list_fixtures_empty(
 ) -> None:
     """List endpoint returns an empty list when no fixtures exist."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=5, cols=5, version_number=1)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
 
     response = await client.get(
         _fixtures_url(store.id, layout.id),
@@ -303,9 +361,13 @@ async def test_get_fixture_returns_200(
 ) -> None:
     """Any org member can fetch a fixture by ID."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=5, cols=5, version_number=1)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
     fixture = await create_fixture(db, layout_version_id=layout.id, name="North Wall")
 
     response = await client.get(
@@ -326,9 +388,13 @@ async def test_get_fixture_unknown_id_returns_404(
 ) -> None:
     """Fetching a non-existent fixture ID returns 404."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=5, cols=5, version_number=1)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
 
     response = await client.get(
         _fixture_url(store.id, layout.id, uuid.uuid4()),
@@ -349,10 +415,16 @@ async def test_update_fixture_type_and_name(
 ) -> None:
     """Owner can update fixture_type and name."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=5, cols=5, version_number=1)
-    fixture = await create_fixture(db, layout_version_id=layout.id, cells=[{"row": 0, "col": 0}])
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
+    fixture = await create_fixture(
+        db, layout_version_id=layout.id, cells=[{"row": 0, "col": 0}]
+    )
 
     response = await client.put(
         _fixture_url(store.id, layout.id, fixture.id),
@@ -373,10 +445,16 @@ async def test_update_fixture_cells(
 ) -> None:
     """Owner can replace cells on a fixture."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=5, cols=5, version_number=1)
-    fixture = await create_fixture(db, layout_version_id=layout.id, cells=[{"row": 0, "col": 0}])
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
+    fixture = await create_fixture(
+        db, layout_version_id=layout.id, cells=[{"row": 0, "col": 0}]
+    )
 
     response = await client.put(
         _fixture_url(store.id, layout.id, fixture.id),
@@ -396,11 +474,25 @@ async def test_update_fixture_overlap_rejected(
 ) -> None:
     """Updating fixture cells to overlap another fixture returns 409."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=5, cols=5, version_number=1)
-    await create_fixture(db, layout_version_id=layout.id, fixture_type=FixtureType.WALL, cells=[{"row": 3, "col": 3}])
-    fixture2 = await create_fixture(db, layout_version_id=layout.id, fixture_type=FixtureType.DOOR, cells=[{"row": 4, "col": 4}])
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
+    await create_fixture(
+        db,
+        layout_version_id=layout.id,
+        fixture_type=FixtureType.WALL,
+        cells=[{"row": 3, "col": 3}],
+    )
+    fixture2 = await create_fixture(
+        db,
+        layout_version_id=layout.id,
+        fixture_type=FixtureType.DOOR,
+        cells=[{"row": 4, "col": 4}],
+    )
 
     response = await client.put(
         _fixture_url(store.id, layout.id, fixture2.id),
@@ -422,9 +514,13 @@ async def test_delete_fixture_returns_204(
 ) -> None:
     """Owner can delete a fixture; subsequent GET returns 404."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=5, cols=5, version_number=1)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
     fixture = await create_fixture(db, layout_version_id=layout.id)
 
     response = await client.delete(
@@ -449,9 +545,13 @@ async def test_delete_fixture_unknown_id_returns_404(
 ) -> None:
     """Deleting a non-existent fixture ID returns 404."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=5, cols=5, version_number=1)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
 
     response = await client.delete(
         _fixture_url(store.id, layout.id, uuid.uuid4()),
@@ -472,14 +572,22 @@ async def test_create_zone_overlapping_fixture_returns_409(
 ) -> None:
     """Creating a zone whose cells overlap an existing fixture returns 409."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
-    layout = await create_layout_version(db, store_id=store.id, rows=5, cols=5, version_number=1)
+    layout = await create_layout_version(
+        db, store_id=store.id, rows=5, cols=5, version_number=1
+    )
     await create_fixture(db, layout_version_id=layout.id, cells=[{"row": 2, "col": 2}])
 
     response = await client.post(
         f"/api/stores/{store.id}/layouts/{layout.id}/zones",
-        json={"name": "Conflict Zone", "color": "#00FF00", "cells": [{"row": 2, "col": 2}]},
+        json={
+            "name": "Conflict Zone",
+            "color": "#00FF00",
+            "cells": [{"row": 2, "col": 2}],
+        },
         headers=_org_headers(org.id),
     )
 
@@ -497,13 +605,18 @@ async def test_fixtures_appear_in_active_layout_response(
 ) -> None:
     """Fixtures are included in the GET /layouts/active response payload."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE
+    )
     store = await create_store(db, org_id=org.id)
     layout = await create_layout_version(
         db, store_id=store.id, rows=5, cols=5, version_number=1, is_active=True
     )
     fixture = await create_fixture(
-        db, layout_version_id=layout.id, fixture_type=FixtureType.STAIRS, cells=[{"row": 0, "col": 0}]
+        db,
+        layout_version_id=layout.id,
+        fixture_type=FixtureType.STAIRS,
+        cells=[{"row": 0, "col": 0}],
     )
 
     response = await client.get(
