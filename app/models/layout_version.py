@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
+
+if TYPE_CHECKING:
+    from app.models.zone import Zone
 
 
 class LayoutVersion(BaseModel):
@@ -40,5 +44,11 @@ class LayoutVersion(BaseModel):
         onupdate=func.now(),
         nullable=False,
     )
-    # TODO(BE-07): add `zones` relationship once Zone model is defined in the
-    #              zones-cellset PR (back_populates="layout_version", lazy="selectin").
+
+    # Populated in BE-07 — selectin-loaded so zones are always available on read
+    zones: Mapped[list["Zone"]] = relationship(
+        "Zone",
+        back_populates="layout_version",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+    )

@@ -7,6 +7,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from app.zones.schemas import ZoneRead
+
 
 class LayoutVersionCreate(BaseModel):
     """Payload for creating a new layout version."""
@@ -28,6 +30,6 @@ class LayoutVersionRead(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    # Relationship stubs — populated in BE-07 (zones) and BE-08 (fixtures)
-    zones: list = []
-    fixtures: list = []
+    zones: list[ZoneRead] = Field(default_factory=list)
+    # fixtures populated in BE-08
+    fixtures: list = Field(default_factory=list)
