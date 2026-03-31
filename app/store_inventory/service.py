@@ -470,9 +470,7 @@ async def remove_from_zone(
     )
     active = active_result.scalar_one_or_none()
     if active is None:
-        raise NotFound(
-            f"No active placement found for inventory entry {inventory_id}"
-        )
+        raise NotFound(f"No active placement found for inventory entry {inventory_id}")
 
     active.ended_at = datetime.now(timezone.utc)
     await db.flush()
