@@ -20,6 +20,7 @@ Complete reference for every endpoint in the EasyInventory API. All routes retur
 - [Stores](#stores)
 - [Store Inventory](#store-inventory)
 - [Inventory Movements](#inventory-movements)
+- [Inventory Placements](#inventory-placements)
 - [Layout Versions](#layout-versions)
 - [Zones](#zones)
 - [Admin: Organizations](#admin-organizations)
@@ -930,6 +931,120 @@ Records an outgoing stock sale. Decrements the inventory entry's `quantity` by t
 **Errors:**
 - `400` — Insufficient stock (sale quantity exceeds `quantity` on the inventory entry).
 - `404` — Inventory entry not found.
+- `404` — Store not found in the current org.
+
+---
+
+## Inventory Placements
+
+Inventory placements record where on the shop floor each inventory item is physically located. Only one placement per inventory item may be active (`ended_at IS NULL`) at a time. Assigning an item to a new zone automatically closes the previous active placement.
+
+All placement endpoints are nested under an inventory entry: `/api/stores/{store_id}/inventory/{inventory_id}/placements`.
+
+They require authentication and a valid `X-Org-Id` header, and validate that the `store_id` belongs to the caller's organisation and that the referenced zone belongs to one of that store's layout versions.
+
+---
+
+### `PATCH /api/stores/{store_id}/inventory/{inventory_id}/placements`
+
+Assigns the inventory item to a zone. If the item is already in a zone, the previous active placement is closed automatically (`ended_at` set to now) and a new one is created.
+
+**Auth:** Required — any org member  
+**Request Body**
+
+```json
+{
+  "active_zone_id": "zone-uuid"
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `active_zone_id` | UUID | Yes | ID of the zone to assign the item to. Must belong to one of the store's layout versions. |
+
+**Response** `201`
+
+```json
+{
+  "id": "placement-uuid",
+  "store_inventory_id": "entry-uuid",
+  "zone_id": "zone-uuid",
+  "zone_name": "Refrigerated Aisle",
+  "started_at": "2026-03-31T14:00:00Z",
+  "ended_at": null,
+  "placed_by_user_id": "user-uuid",
+  "duration_display": null,
+  "created_at": "2026-03-31T14:00:00Z"
+}
+```
+
+**Errors:**
+- `404` — Inventory entry not found in this store.
+- `404` — Zone not found in this store's layout versions.
+- `404` — Store not found in the current org.
+
+---
+
+### `GET /api/stores/{store_id}/inventory/{inventory_id}/placements`
+
+Returns the full placement history for the inventory item, newest first. The currently active placement (if any) will have `ended_at: null`.
+
+**Auth:** Required — any org member  
+**Response** `200`
+
+```json
+[
+  {
+    "id": "placement-uuid",
+    "store_inventory_id": "entry-uuid",
+    "zone_id": "zone-uuid",
+    "zone_name": "Refrigerated Aisle",
+    "started_at": "2026-03-31T16:00:00Z",
+    "ended_at": null,
+    "placed_by_user_id": "user-uuid",
+    "duration_display": null,
+    "created_at": "2026-03-31T16:00:00Z"
+  },
+  {
+    "id": "placement-uuid-2",
+    "store_inventory_id": "entry-uuid",
+    "zone_id": "zone-uuid-2",
+    "zone_name": "Dry Goods",
+    "started_at": "2026-03-30T09:00:00Z",
+    "ended_at": "2026-03-31T16:00:00Z",
+    "placed_by_user_id": "user-uuid",
+    "duration_display": "1 day, 7 hrs",
+    "created_at": "2026-03-30T09:00:00Z"
+  }
+]
+```
+
+**`duration_display` format:**
+
+| Duration | Example output |
+|---|---|
+| ≥ 1 day | `"2 days, 3 hrs"` |
+| ≥ 1 hour, < 1 day | `"4 hrs, 30 mins"` |
+| ≥ 1 minute, < 1 hour | `"45 mins"` |
+| < 1 minute | `"< 1 min"` |
+| Active (ended_at is null) | `null` |
+
+**Errors:**
+- `404` — Inventory entry not found in this store.
+- `404` — Store not found in the current org.
+
+---
+
+### `DELETE /api/stores/{store_id}/inventory/{inventory_id}/placements/current`
+
+Removes the inventory item from its current zone by closing the active placement (`ended_at` set to now). Returns `404` if the item is not currently assigned to any zone.
+
+**Auth:** Required — any org member  
+**Response** `204` — No content
+
+**Errors:**
+- `404` — Inventory entry has no active placement.
+- `404` — Inventory entry not found in this store.
 - `404` — Store not found in the current org.
 
 ---
