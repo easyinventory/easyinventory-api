@@ -15,6 +15,7 @@ from app.models.organization import Organization
 from app.models.org_membership import OrgMembership
 from app.models.product import Product
 from app.models.product_supplier import ProductSupplier
+from app.models.store import Store
 from app.models.supplier import Supplier
 from app.models.user import User
 
@@ -159,3 +160,17 @@ async def create_product_supplier(
     db.add(link)
     await db.flush()
     return link
+
+
+async def create_store(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    name: str = "Test Store",
+    is_active: bool = True,
+) -> Store:
+    """Insert a ``Store`` row and return it."""
+    store = Store(org_id=org_id, name=name, is_active=is_active)
+    db.add(store)
+    await db.flush()
+    return store

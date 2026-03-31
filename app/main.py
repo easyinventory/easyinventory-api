@@ -19,6 +19,7 @@ from app.admin.routes_orgs import router as admin_orgs_router
 from app.admin.routes_users import router as admin_users_router
 from app.health.routes import router as health_router
 from app.products.routes import router as products_router
+from app.stores.routes import router as stores_router
 from app.suppliers.routes import router as suppliers_router
 
 # ── Structured JSON logging to stdout → Docker → CloudWatch ──
@@ -81,6 +82,7 @@ def create_app() -> FastAPI:
     app.include_router(orgs_router)
     app.include_router(suppliers_router)
     app.include_router(products_router)
+    app.include_router(stores_router)
 
     return app
 

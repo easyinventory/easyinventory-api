@@ -113,15 +113,11 @@ def app(db: AsyncSession):
     application = create_app()
 
     async def _override_get_db():
-        # Mirror production get_db semantics: per-request transaction
-        # with commit on success and rollback on error, inside the
-        # per-test outer transaction provided by the ``db`` fixture.
-        async with db.begin():
-            try:
-                yield db
-            except Exception:
-                await db.rollback()
-                raise
+        # Yield the test session directly.  The outer transaction set up by
+        # the ``db`` fixture wraps everything and is rolled back after each
+        # test, so we don't need to (and must not) begin a new transaction
+        # here — doing so would collide with the active SAVEPOINT.
+        yield db
 
     application.dependency_overrides[get_db] = _override_get_db
     return application
