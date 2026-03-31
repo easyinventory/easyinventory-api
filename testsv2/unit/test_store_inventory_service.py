@@ -103,10 +103,11 @@ async def test_list_inventory_returns_entries(db: AsyncSession) -> None:
     await create_store_inventory(db, store_id=store.id, product_id=product_a.id)
     await create_store_inventory(db, store_id=store.id, product_id=product_b.id)
 
-    entries = await list_inventory(db, store_id=store.id)
+    items, total = await list_inventory(db, store_id=store.id)
 
-    assert len(entries) == 2
-    product_ids = {e.product_id for e in entries}
+    assert total == 2
+    assert len(items) == 2
+    product_ids = {e.product_id for e in items}
     assert product_ids == {product_a.id, product_b.id}
 
 
@@ -119,9 +120,10 @@ async def test_list_inventory_scoped_to_store(db: AsyncSession) -> None:
 
     await create_store_inventory(db, store_id=store_b.id, product_id=product.id)
 
-    entries = await list_inventory(db, store_id=store_a.id)
+    items, total = await list_inventory(db, store_id=store_a.id)
 
-    assert entries == []
+    assert items == []
+    assert total == 0
 
 
 async def test_list_inventory_empty(db: AsyncSession) -> None:
@@ -129,9 +131,10 @@ async def test_list_inventory_empty(db: AsyncSession) -> None:
     org = await create_org(db)
     store = await create_store(db, org_id=org.id)
 
-    entries = await list_inventory(db, store_id=store.id)
+    items, total = await list_inventory(db, store_id=store.id)
 
-    assert entries == []
+    assert items == []
+    assert total == 0
 
 
 # ── get_entry ─────────────────────────────────────────────────────────────────
@@ -229,3 +232,139 @@ async def test_delete_entry_not_found(db: AsyncSession) -> None:
 
     with pytest.raises(NotFound):
         await delete_entry(db, entry_id=uuid.uuid4(), store_id=store.id)
+
+
+# ── list_inventory: product field ─────────────────────────────────────────────
+
+
+async def test_list_inventory_product_field_populated(db: AsyncSession) -> None:
+    """list_inventory eagerly loads the product relationship on each entry."""
+    org = await create_org(db)
+    store = await create_store(db, org_id=org.id)
+    product = await create_product(
+        db, org_id=org.id, name="Widget", category="Hardware", sku="W-001"
+    )
+    await create_store_inventory(db, store_id=store.id, product_id=product.id)
+
+    items, _ = await list_inventory(db, store_id=store.id)
+
+    assert len(items) == 1
+    assert items[0].product is not None
+    assert items[0].product.name == "Widget"
+    assert items[0].product.category == "Hardware"
+    assert items[0].product.sku == "W-001"
+
+
+# ── list_inventory: search ────────────────────────────────────────────────────
+
+
+async def test_list_inventory_search_by_product_name(db: AsyncSession) -> None:
+    """search= filters entries whose product name matches (case-insensitive)."""
+    org = await create_org(db)
+    store = await create_store(db, org_id=org.id)
+    widget = await create_product(db, org_id=org.id, name="Blue Widget")
+    gadget = await create_product(db, org_id=org.id, name="Red Gadget")
+    await create_store_inventory(db, store_id=store.id, product_id=widget.id)
+    await create_store_inventory(db, store_id=store.id, product_id=gadget.id)
+
+    items, total = await list_inventory(db, store_id=store.id, search="widget")
+
+    assert total == 1
+    assert items[0].product_id == widget.id
+
+
+async def test_list_inventory_search_by_product_category(db: AsyncSession) -> None:
+    """search= also matches against product category."""
+    org = await create_org(db)
+    store = await create_store(db, org_id=org.id)
+    tool = await create_product(db, org_id=org.id, name="Hammer", category="Tools")
+    snack = await create_product(db, org_id=org.id, name="Chips", category="Food")
+    await create_store_inventory(db, store_id=store.id, product_id=tool.id)
+    await create_store_inventory(db, store_id=store.id, product_id=snack.id)
+
+    items, total = await list_inventory(db, store_id=store.id, search="tools")
+
+    assert total == 1
+    assert items[0].product_id == tool.id
+
+
+async def test_list_inventory_search_no_match_returns_empty(db: AsyncSession) -> None:
+    """search= with no matching products returns an empty result."""
+    org = await create_org(db)
+    store = await create_store(db, org_id=org.id)
+    product = await create_product(db, org_id=org.id, name="Anvil")
+    await create_store_inventory(db, store_id=store.id, product_id=product.id)
+
+    items, total = await list_inventory(db, store_id=store.id, search="zzznomatch")
+
+    assert total == 0
+    assert items == []
+
+
+# ── list_inventory: category filter ──────────────────────────────────────────
+
+
+async def test_list_inventory_category_filter(db: AsyncSession) -> None:
+    """category= filters entries to only those whose product category matches."""
+    org = await create_org(db)
+    store = await create_store(db, org_id=org.id)
+    hardware = await create_product(db, org_id=org.id, name="Bolt", category="Hardware")
+    food = await create_product(db, org_id=org.id, name="Bread", category="Food")
+    await create_store_inventory(db, store_id=store.id, product_id=hardware.id)
+    await create_store_inventory(db, store_id=store.id, product_id=food.id)
+
+    items, total = await list_inventory(db, store_id=store.id, category="hardware")
+
+    assert total == 1
+    assert items[0].product_id == hardware.id
+
+
+# ── list_inventory: pagination ────────────────────────────────────────────────
+
+
+async def test_list_inventory_pagination_page_size(db: AsyncSession) -> None:
+    """page_size= limits the number of returned items."""
+    org = await create_org(db)
+    store = await create_store(db, org_id=org.id)
+    products = [
+        await create_product(db, org_id=org.id, name=f"Product {i}") for i in range(5)
+    ]
+    for p in products:
+        await create_store_inventory(db, store_id=store.id, product_id=p.id)
+
+    items, total = await list_inventory(db, store_id=store.id, page=1, page_size=2)
+
+    assert total == 5  # total reflects all matching rows
+    assert len(items) == 2
+
+
+async def test_list_inventory_pagination_second_page(db: AsyncSession) -> None:
+    """page=2 with page_size=2 returns the third and fourth items."""
+    org = await create_org(db)
+    store = await create_store(db, org_id=org.id)
+    products = [
+        await create_product(db, org_id=org.id, name=f"Item {i:02d}") for i in range(4)
+    ]
+    for p in products:
+        await create_store_inventory(db, store_id=store.id, product_id=p.id)
+
+    first_page, _ = await list_inventory(db, store_id=store.id, page=1, page_size=2)
+    second_page, _ = await list_inventory(db, store_id=store.id, page=2, page_size=2)
+
+    first_ids = {e.id for e in first_page}
+    second_ids = {e.id for e in second_page}
+    assert first_ids.isdisjoint(second_ids)  # no overlap between pages
+    assert len(second_page) == 2
+
+
+async def test_list_inventory_pagination_beyond_last_page(db: AsyncSession) -> None:
+    """Requesting a page beyond the last returns empty items with correct total."""
+    org = await create_org(db)
+    store = await create_store(db, org_id=org.id)
+    product = await create_product(db, org_id=org.id)
+    await create_store_inventory(db, store_id=store.id, product_id=product.id)
+
+    items, total = await list_inventory(db, store_id=store.id, page=999, page_size=20)
+
+    assert total == 1
+    assert items == []

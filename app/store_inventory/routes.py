@@ -78,7 +78,7 @@ async def get_store_inventory(
         page_size=page_size,
     )
     return PaginatedInventoryResponse(
-        items=items,
+        items=[StoreInventoryRead.model_validate(item) for item in items],
         total=total,
         page=page,
         page_size=page_size,

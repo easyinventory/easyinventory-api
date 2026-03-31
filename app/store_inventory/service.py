@@ -149,6 +149,7 @@ async def get_entry(
             )
         )
         .options(selectinload(StoreInventory.product))
+        .execution_options(populate_existing=True)
     )
     entry = result.scalar_one_or_none()
     if entry is None:
