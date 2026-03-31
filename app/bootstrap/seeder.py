@@ -23,8 +23,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.bootstrap.seed_data import SEED_PRODUCTS, SEED_SUPPLIERS
 from app.core.config import settings
 from app.core.roles import OrgRole, SystemRole
-from app.models.organization import Organization
 from app.models.org_membership import OrgMembership
+from app.orgs.service import create_organization
 from app.models.product import Product
 from app.models.product_supplier import ProductSupplier
 from app.models.supplier import Supplier
@@ -68,9 +68,7 @@ async def run_bootstrap(db: AsyncSession) -> None:
         db.add(user)
         await db.flush()
 
-        org = Organization(name=org_name)
-        db.add(org)
-        await db.flush()
+        org = await create_organization(db, org_name)
 
         membership = OrgMembership(
             org_id=org.id,
@@ -100,9 +98,7 @@ async def run_bootstrap(db: AsyncSession) -> None:
         existing_user.system_role = SystemRole.ADMIN
         print(f"[bootstrap] Promoted '{email}' to {SystemRole.ADMIN}")
 
-    org = Organization(name=org_name)
-    db.add(org)
-    await db.flush()
+    org = await create_organization(db, org_name)
 
     membership = OrgMembership(
         org_id=org.id,

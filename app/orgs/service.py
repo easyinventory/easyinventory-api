@@ -106,3 +106,22 @@ async def delete_membership(
     """Permanently delete a membership."""
     await db.delete(membership)
     await db.flush()
+
+
+async def create_organization(db: AsyncSession, name: str) -> Organization:
+    """
+    Create a new organization and auto-create its default store.
+
+    This is the single authoritative path for org creation — call this
+    from admin routes, the bootstrap seeder, and any future flows so
+    every org always has at least one store.
+    """
+    from app.stores.service import create_store  # local import avoids circular at module level
+
+    org = Organization(name=name)
+    db.add(org)
+    await db.flush()
+
+    await create_store(db, org.id, f"{org.name} Default Store")
+
+    return org
