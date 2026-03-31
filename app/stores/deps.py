@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import Depends, HTTPException, Path, status
+from fastapi import Depends, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.exceptions import NotFound
 from app.models.org_membership import OrgMembership
 from app.models.store import Store
 from app.orgs.deps import get_current_org_membership
@@ -23,10 +22,4 @@ async def get_store_from_path(
 
     Raises 404 if the store does not exist or belongs to a different org.
     """
-    try:
-        return await get_store_by_id(db, store_id, membership.org_id)
-    except NotFound as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
+    return await get_store_by_id(db, store_id, membership.org_id)
