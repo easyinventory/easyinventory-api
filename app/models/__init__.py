@@ -8,6 +8,7 @@ from app.models.product_supplier import ProductSupplier
 from app.models.store import Store
 from app.models.layout_version import LayoutVersion
 from app.models.zone import Zone
+from app.models.fixture import Fixture
 
 __all__ = [
     "BaseModel",
@@ -20,4 +21,5 @@ __all__ = [
     "Store",
     "LayoutVersion",
     "Zone",
+    "Fixture",
 ]

@@ -13,6 +13,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import BaseModel
 
 if TYPE_CHECKING:
+    from app.models.fixture import Fixture
     from app.models.zone import Zone
 
 
@@ -48,6 +49,14 @@ class LayoutVersion(BaseModel):
     # Populated in BE-07 — selectin-loaded so zones are always available on read
     zones: Mapped[list["Zone"]] = relationship(
         "Zone",
+        back_populates="layout_version",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+    )
+
+    # Populated in BE-08 — selectin-loaded so fixtures are always available on read
+    fixtures: Mapped[list["Fixture"]] = relationship(
+        "Fixture",
         back_populates="layout_version",
         lazy="selectin",
         cascade="all, delete-orphan",
