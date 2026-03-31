@@ -33,4 +33,5 @@ class LayoutVersion(BaseModel):
         onupdate=func.now(),
         nullable=False,
     )
-    # zones relationship added in BE-07 once the Zone model exists
+    # TODO(BE-07): add `zones` relationship once Zone model is defined in the
+    #              zones-cellset PR (back_populates="layout_version", lazy="selectin").

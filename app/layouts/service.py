@@ -77,6 +77,8 @@ async def get_active_layout(
     store_id: uuid.UUID,
 ) -> LayoutVersion:
     """Return the currently active layout version for the store."""
+    # TODO(BE-07): add .options(selectinload(LayoutVersion.zones)) once the Zone
+    #              model and relationship are introduced in the zones-cellset PR.
     stmt = (
         select(LayoutVersion)
         .where(
