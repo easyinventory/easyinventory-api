@@ -89,13 +89,21 @@ async def list_inventory(
     - ``category`` performs a case-insensitive partial match on product category only.
     - ``page`` / ``page_size`` control the offset-based pagination window.
 
-    Returns a ``(items, total)`` tuple where ``total`` is the unfiltered count.
+    Returns a ``(items, total)`` tuple where ``total`` is the number of rows
+    matching the provided filters (including ``search``/``category``) before
+    pagination.
     """
-    filters = [StoreInventory.store_id == store_id]
+    if page < 1:
+        raise ValueError(f"page must be >= 1, got {page}")
+    if page_size < 1:
+        raise ValueError(f"page_size must be >= 1, got {page_size}")
+
+    store_filter = [StoreInventory.store_id == store_id]
+    product_filters: list = []
 
     if search:
         term = f"%{search}%"
-        filters.append(
+        product_filters.append(
             or_(
                 Product.name.ilike(term),
                 Product.category.ilike(term),
@@ -103,23 +111,37 @@ async def list_inventory(
         )
 
     if category:
-        filters.append(Product.category.ilike(f"%{category}%"))
+        product_filters.append(Product.category.ilike(f"%{category}%"))
+
+    needs_join = bool(product_filters)
+    all_filters = store_filter + product_filters
 
     # Count matching rows before pagination.
-    count_stmt = (
-        select(func.count(StoreInventory.id))
-        .join(Product, StoreInventory.product_id == Product.id)
-        .where(*filters)
-    )
+    # Only JOIN to the products table when product-level predicates are present.
+    if needs_join:
+        count_stmt = (
+            select(func.count(StoreInventory.id))
+            .join(Product, StoreInventory.product_id == Product.id)
+            .where(*all_filters)
+        )
+    else:
+        count_stmt = select(func.count(StoreInventory.id)).where(*store_filter)
     total: int = (await db.execute(count_stmt)).scalar_one()
 
-    # Fetch the requested page with joined product data.
+    # Fetch the requested page with eagerly loaded product data.
+    # The JOIN is omitted when no product-table predicates are active; selectinload
+    # handles the product relationship efficiently in both cases.
+    if needs_join:
+        items_stmt = (
+            select(StoreInventory)
+            .join(Product, StoreInventory.product_id == Product.id)
+            .where(*all_filters)
+        )
+    else:
+        items_stmt = select(StoreInventory).where(*store_filter)
     items_stmt = (
-        select(StoreInventory)
-        .join(Product, StoreInventory.product_id == Product.id)
-        .where(*filters)
-        .options(selectinload(StoreInventory.product))
-        .order_by(StoreInventory.created_at)
+        items_stmt.options(selectinload(StoreInventory.product))
+        .order_by(StoreInventory.created_at, StoreInventory.id)
         .offset((page - 1) * page_size)
         .limit(page_size)
     )

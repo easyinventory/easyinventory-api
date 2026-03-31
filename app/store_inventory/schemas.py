@@ -47,7 +47,7 @@ class StoreInventoryRead(BaseModel):
     low_stock_threshold: float | None
     created_at: datetime
     updated_at: datetime
-    product: ProductSummary | None = None
+    product: ProductSummary
 
     model_config = {"from_attributes": True}
 
