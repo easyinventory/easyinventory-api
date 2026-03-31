@@ -6,6 +6,7 @@ from app.models.supplier import Supplier
 from app.models.product import Product
 from app.models.product_supplier import ProductSupplier
 from app.models.store import Store
+from app.models.layout_version import LayoutVersion
 
 __all__ = [
     "BaseModel",
@@ -16,4 +17,5 @@ __all__ = [
     "Product",
     "ProductSupplier",
     "Store",
+    "LayoutVersion",
 ]

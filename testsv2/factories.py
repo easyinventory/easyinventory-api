@@ -11,6 +11,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.roles import OrgRole, SystemRole
+from app.models.layout_version import LayoutVersion
 from app.models.organization import Organization
 from app.models.org_membership import OrgMembership
 from app.models.product import Product
@@ -174,3 +175,25 @@ async def create_store(
     db.add(store)
     await db.flush()
     return store
+
+
+async def create_layout_version(
+    db: AsyncSession,
+    *,
+    store_id: uuid.UUID,
+    rows: int = 5,
+    cols: int = 5,
+    version_number: int = 1,
+    is_active: bool = False,
+) -> LayoutVersion:
+    """Insert a ``LayoutVersion`` row and return it."""
+    layout = LayoutVersion(
+        store_id=store_id,
+        rows=rows,
+        cols=cols,
+        version_number=version_number,
+        is_active=is_active,
+    )
+    db.add(layout)
+    await db.flush()
+    return layout

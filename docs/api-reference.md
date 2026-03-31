@@ -18,6 +18,7 @@ Complete reference for every endpoint in the EasyInventory API. All routes retur
 - [Products](#products)
 - [Product–Supplier Links](#productsupplier-links)
 - [Stores](#stores)
+- [Layout Versions](#layout-versions)
 - [Admin: Organizations](#admin-organizations)
 - [Admin: Users](#admin-users)
 - [Invite Flow Details](#invite-flow-details)
@@ -671,6 +672,143 @@ Creates a new store within the current organization.
 **Errors:**
 - `403` — Caller is not the org owner.
 - `422` — Missing or empty `name`.
+
+---
+
+## Layout Versions
+
+Layout versions represent versioned grid configurations for a store. Each version defines a rows × cols grid. Only one version can be active at a time per store. Zones (BE-07) and fixtures (BE-08) are nested within a layout version.
+
+**All layout endpoints require a valid `X-Org-Id` header** and validate that `store_id` belongs to the caller's organization.
+
+---
+
+### `GET /api/stores/{store_id}/layouts`
+
+Returns all layout versions for the store ordered by `version_number` ascending.
+
+**Auth:** Required — any org member  
+**Response** `200`
+
+```json
+[
+  {
+    "id": "layout-uuid",
+    "store_id": "store-uuid",
+    "version_number": 1,
+    "rows": 10,
+    "cols": 8,
+    "is_active": false,
+    "created_at": "2026-03-31T10:00:00Z",
+    "updated_at": "2026-03-31T10:00:00Z",
+    "zones": [],
+    "fixtures": []
+  }
+]
+```
+
+**Errors:**
+- `404` — Store not found in the current org.
+
+---
+
+### `GET /api/stores/{store_id}/layouts/active`
+
+Returns the currently active layout version with zones and fixtures eagerly loaded.
+
+**Auth:** Required — any org member  
+**Response** `200`
+
+```json
+{
+  "id": "layout-uuid",
+  "store_id": "store-uuid",
+  "version_number": 2,
+  "rows": 10,
+  "cols": 8,
+  "is_active": true,
+  "created_at": "2026-03-31T10:00:00Z",
+  "updated_at": "2026-03-31T11:00:00Z",
+  "zones": [],
+  "fixtures": []
+}
+```
+
+**Errors:**
+- `404` — No active layout version exists for the store.
+- `404` — Store not found in the current org.
+
+---
+
+### `POST /api/stores/{store_id}/layouts`
+
+Creates a new layout version. The `version_number` is auto-incremented (starts at 1, increments by 1 for each subsequent version). New versions are inactive by default.
+
+**Auth:** Required — `ORG_OWNER` or `ORG_ADMIN`  
+**Request Body**
+
+```json
+{
+  "rows": 10,
+  "cols": 8
+}
+```
+
+| Field | Type | Required | Constraints | Description |
+|---|---|---|---|---|
+| `rows` | integer | Yes | min 2, max 30 | Number of grid rows |
+| `cols` | integer | Yes | min 2, max 30 | Number of grid columns |
+
+**Response** `201`
+
+```json
+{
+  "id": "layout-uuid",
+  "store_id": "store-uuid",
+  "version_number": 1,
+  "rows": 10,
+  "cols": 8,
+  "is_active": false,
+  "created_at": "2026-03-31T10:00:00Z",
+  "updated_at": "2026-03-31T10:00:00Z",
+  "zones": [],
+  "fixtures": []
+}
+```
+
+**Errors:**
+- `403` — Caller is not `ORG_OWNER` or `ORG_ADMIN`.
+- `404` — Store not found in the current org.
+- `422` — `rows` or `cols` is outside the 2–30 range.
+
+---
+
+### `POST /api/stores/{store_id}/layouts/{layout_id}/activate`
+
+Activates the specified layout version and deactivates all other versions for the store.
+
+**Auth:** Required — `ORG_OWNER` or `ORG_ADMIN`  
+**Response** `200` — Returns the now-active layout version.
+
+```json
+{
+  "id": "layout-uuid",
+  "store_id": "store-uuid",
+  "version_number": 2,
+  "rows": 10,
+  "cols": 8,
+  "is_active": true,
+  "created_at": "2026-03-31T10:00:00Z",
+  "updated_at": "2026-03-31T11:00:00Z",
+  "zones": [],
+  "fixtures": []
+}
+```
+
+**Errors:**
+- `403` — Caller is not `ORG_OWNER` or `ORG_ADMIN`.
+- `404` — Layout version not found for the store.
+- `404` — Store not found in the current org.
 
 ---
 
