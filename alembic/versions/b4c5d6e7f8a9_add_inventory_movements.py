@@ -17,8 +17,6 @@ depends_on = None
 
 
 def upgrade() -> None:
-    movement_type = sa.Enum("receipt", "sale", name="movement_type", create_type=True)
-
     op.create_table(
         "inventory_movements",
         sa.Column(
@@ -32,7 +30,11 @@ def upgrade() -> None:
             postgresql.UUID(as_uuid=True),
             nullable=False,
         ),
-        sa.Column("movement_type", movement_type, nullable=False),
+        sa.Column(
+            "movement_type",
+            sa.Enum("receipt", "sale", name="movement_type", create_type=True),
+            nullable=False,
+        ),
         sa.Column("quantity", sa.Integer(), nullable=False),
         sa.Column("unit_cost", sa.Numeric(10, 2), nullable=True),
         sa.Column("unit_price", sa.Numeric(10, 2), nullable=True),
