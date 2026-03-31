@@ -19,6 +19,7 @@ Complete reference for every endpoint in the EasyInventory API. All routes retur
 - [Product–Supplier Links](#productsupplier-links)
 - [Stores](#stores)
 - [Store Inventory](#store-inventory)
+- [Inventory Movements](#inventory-movements)
 - [Layout Versions](#layout-versions)
 - [Zones](#zones)
 - [Admin: Organizations](#admin-organizations)
@@ -821,6 +822,114 @@ Removes a product from the store's inventory.
 **Errors:**
 - `403` — Caller is not the org owner.
 - `404` — Entry not found for this store.
+- `404` — Store not found in the current org.
+
+---
+
+## Inventory Movements
+
+Inventory movements record every stock change with a full audit trail. Each movement stores who performed the action, the quantity, optional cost/price, and an optional reference number. Two movement types are supported:
+
+| Type | Effect | Endpoint |
+|---|---|---|
+| `receipt` | Increases store quantity | `POST …/receipts` |
+| `sale` | Decreases store quantity (validates no negative stock) | `POST …/sales` |
+
+All movement endpoints are nested under an inventory entry: `/api/stores/{store_id}/inventory/{inventory_id}/receipts` and `/api/stores/{store_id}/inventory/{inventory_id}/sales`.
+
+They require authentication and a valid `X-Org-Id` header, and validate that `store_id` belongs to the caller's organization.
+
+---
+
+### `POST /api/stores/{store_id}/inventory/{inventory_id}/receipts`
+
+Records an incoming stock receipt. Increments the inventory entry's `quantity` by the received amount and creates an `InventoryMovement` record linked to the calling user.
+
+**Auth:** Required — any org member  
+**Request Body**
+
+```json
+{
+  "quantity": 50,
+  "unit_cost": "1.25",
+  "reference_number": "PO-2026-001",
+  "notes": "Spring restock from Fresh Farms"
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `quantity` | integer | Yes (> 0) | Number of units received |
+| `unit_cost` | decimal string | No | Per-unit cost paid |
+| `reference_number` | string (≤ 100 chars) | No | Purchase order or delivery reference |
+| `notes` | string | No | Free-text notes |
+
+**Response** `201`
+
+```json
+{
+  "id": "movement-uuid",
+  "store_inventory_id": "entry-uuid",
+  "movement_type": "receipt",
+  "quantity": 50,
+  "unit_cost": "1.25",
+  "unit_price": null,
+  "reference_number": "PO-2026-001",
+  "notes": "Spring restock from Fresh Farms",
+  "performed_by_user_id": "user-uuid",
+  "created_at": "2026-03-31T14:00:00Z"
+}
+```
+
+**Errors:**
+- `404` — Inventory entry not found.
+- `404` — Store not found in the current org.
+
+---
+
+### `POST /api/stores/{store_id}/inventory/{inventory_id}/sales`
+
+Records an outgoing stock sale. Decrements the inventory entry's `quantity` by the sold amount and creates an `InventoryMovement` record linked to the calling user. Rejected if the sale quantity exceeds available stock.
+
+**Auth:** Required — any org member  
+**Request Body**
+
+```json
+{
+  "quantity": 12,
+  "unit_price": "2.99",
+  "reference_number": "INV-2026-042",
+  "notes": "Weekly sale batch"
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `quantity` | integer | Yes (> 0) | Number of units sold |
+| `unit_price` | decimal string | No | Per-unit price charged |
+| `reference_number` | string (≤ 100 chars) | No | Invoice or POS reference |
+| `notes` | string | No | Free-text notes |
+
+**Response** `201`
+
+```json
+{
+  "id": "movement-uuid",
+  "store_inventory_id": "entry-uuid",
+  "movement_type": "sale",
+  "quantity": 12,
+  "unit_cost": null,
+  "unit_price": "2.99",
+  "reference_number": "INV-2026-042",
+  "notes": "Weekly sale batch",
+  "performed_by_user_id": "user-uuid",
+  "created_at": "2026-03-31T14:05:00Z"
+}
+```
+
+**Errors:**
+- `400` — Insufficient stock (sale quantity exceeds `quantity` on the inventory entry).
+- `404` — Inventory entry not found.
 - `404` — Store not found in the current org.
 
 ---
