@@ -67,6 +67,11 @@ easyinventory-api/
 │   │   ├── schemas.py           #   Store Pydantic schemas
 │   │   └── service.py           #   Store data access
 │   │
+│   ├── layouts/                 # Layout versions domain
+│   │   ├── routes.py            #   Layout CRUD + activate endpoints (store-scoped)
+│   │   ├── schemas.py           #   LayoutVersionCreate / LayoutVersionRead schemas
+│   │   └── service.py           #   Layout data access (create, activate, list, get active)
+│   │
 │   ├── suppliers/               # Suppliers domain
 │   │   ├── routes.py            #   Supplier CRUD endpoints
 │   │   ├── schemas.py           #   Supplier Pydantic schemas
@@ -93,7 +98,8 @@ easyinventory-api/
 │       ├── supplier.py          #   Supplier (org-scoped, contact info)
 │       ├── product.py           #   Product (org-scoped, SKU, category)
 │       ├── product_supplier.py  #   ProductSupplier join table (is_active flag)
-│       └── store.py             #   Store (org-scoped, is_active, updated_at)
+│       ├── store.py             #   Store (org-scoped, is_active, updated_at)
+│       └── layout_version.py    #   LayoutVersion (store-scoped, version_number, rows, cols, is_active)
 │
 ├── alembic/                     # Database migration infrastructure
 │   ├── env.py                   #   Async migration runner (reads DATABASE_URL)
@@ -459,7 +465,8 @@ All ORM models inherit from `BaseModel` (defined in `app/models/base.py`), which
 | `Supplier` | `suppliers` | `org_id` (FK), `name`, `contact_name`, `contact_email`, `contact_phone`, `notes` | — |
 | `Product` | `products` | `org_id` (FK), `name`, `description`, `sku`, `category` | → `ProductSupplier` (one-to-many) |
 | `ProductSupplier` | `product_suppliers` | `product_id` (FK), `supplier_id` (FK), `is_active` | → `Supplier` / Unique on `(product_id, supplier_id)` |
-| `Store` | `stores` | `org_id` (FK, CASCADE), `name`, `is_active`, `updated_at` | — |
+| `Store` | `stores` | `org_id` (FK, CASCADE), `name`, `is_active`, `updated_at` | → `LayoutVersion` (one-to-many) |
+| `LayoutVersion` | `layout_versions` | `store_id` (FK, CASCADE), `version_number`, `rows`, `cols`, `is_active`, `updated_at` | Unique on `(store_id, version_number)` |
 
 ### Key design decisions
 
@@ -469,6 +476,7 @@ All ORM models inherit from `BaseModel` (defined in `app/models/base.py`), which
 - **Soft state on stores** — `Store.is_active` allows deactivating stores without deleting them or their future inventory records.
 - **Join table with metadata** — `ProductSupplier` is not just a simple many-to-many join. It has an `is_active` flag, allowing you to deactivate a specific product-supplier relationship without removing it.
 - **Cascade deletes** — `Store.org_id` is defined with `ondelete="CASCADE"`, so all stores are deleted automatically when their parent organization is deleted.
+- **Layout versioning** — `LayoutVersion` models a point-in-time grid configuration for a store. Versions are immutable once created (grid dimensions cannot be changed), and only one may be `is_active=True` at a time. The `activate` endpoint uses a bulk `UPDATE … SET is_active=False` across the store, then a targeted `UPDATE … SET is_active=True` on the target, making activation atomic within the transaction.
 
 ---
 
