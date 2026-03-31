@@ -47,7 +47,7 @@ async def _check_zone_overlap(
     exclude_zone_id: Optional[uuid.UUID] = None,
 ) -> None:
     """
-    Raise AlreadyExists(409) if the given cells overlap with any existing zone
+    Raise AppError(status_code=409) if the given cells overlap with any existing zone
     in the layout (excluding the zone being updated, if provided).
     """
     stmt = select(Zone).where(Zone.layout_version_id == layout_version_id)
@@ -149,7 +149,7 @@ async def list_zones(
     result = await db.execute(
         select(Zone)
         .where(Zone.layout_version_id == layout_version_id)
-        .order_by(Zone.created_at.asc())
+        .order_by(Zone.created_at.asc(), Zone.id.asc())
     )
     return list(result.scalars().all())
 
