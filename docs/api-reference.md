@@ -836,7 +836,9 @@ Inventory movements record every stock change with a full audit trail. Each move
 | `receipt` | Increases store quantity | `POST …/receipts` |
 | `sale` | Decreases store quantity (validates no negative stock) | `POST …/sales` |
 
-All movement endpoints are nested under an inventory entry: `/api/stores/{store_id}/inventory/{inventory_id}/receipts` and `/api/stores/{store_id}/inventory/{inventory_id}/sales`.
+Movement history can be retrieved via `GET …/movements`.
+
+All movement endpoints are nested under an inventory entry: `/api/stores/{store_id}/inventory/{inventory_id}/`.
 
 They require authentication and a valid `X-Org-Id` header, and validate that `store_id` belongs to the caller's organization.
 
@@ -930,6 +932,48 @@ Records an outgoing stock sale. Decrements the inventory entry's `quantity` by t
 
 **Errors:**
 - `400` — Insufficient stock (sale quantity exceeds `quantity` on the inventory entry).
+- `404` — Inventory entry not found.
+- `404` — Store not found in the current org.
+
+---
+
+### `GET /api/stores/{store_id}/inventory/{inventory_id}/movements`
+
+Returns the full stock-movement history for an inventory item, newest first. Includes both receipts and sales.
+
+**Auth:** Required — any org member  
+**Response** `200`
+
+```json
+[
+  {
+    "id": "movement-uuid",
+    "store_inventory_id": "entry-uuid",
+    "movement_type": "sale",
+    "quantity": 12,
+    "unit_cost": null,
+    "unit_price": "2.99",
+    "reference_number": "INV-2026-042",
+    "notes": "Weekly sale batch",
+    "performed_by_user_id": "user-uuid",
+    "created_at": "2026-03-31T14:05:00Z"
+  },
+  {
+    "id": "movement-uuid-2",
+    "store_inventory_id": "entry-uuid",
+    "movement_type": "receipt",
+    "quantity": 50,
+    "unit_cost": "1.25",
+    "unit_price": null,
+    "reference_number": "PO-2026-001",
+    "notes": "Spring restock from Fresh Farms",
+    "performed_by_user_id": "user-uuid",
+    "created_at": "2026-03-31T14:00:00Z"
+  }
+]
+```
+
+**Errors:**
 - `404` — Inventory entry not found.
 - `404` — Store not found in the current org.
 

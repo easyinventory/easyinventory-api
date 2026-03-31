@@ -31,6 +31,7 @@ from app.store_inventory.service import (
     get_entry,
     get_placement_history,
     list_inventory,
+    list_movements,
     record_receipt,
     record_sale,
     remove_from_zone,
@@ -151,6 +152,16 @@ async def record_inventory_receipt(
     )
     await db.commit()
     return movement
+
+
+@router.get("/{inventory_id}/movements", response_model=list[MovementRead])
+async def list_inventory_movements(
+    inventory_id: uuid.UUID,
+    store: Store = Depends(get_store_from_path),
+    db: AsyncSession = Depends(get_db),
+) -> list[InventoryMovement]:
+    """Return the full stock-movement history for an inventory item, newest first."""
+    return await list_movements(db, inventory_id, store.id)
 
 
 @router.post("/{inventory_id}/sales", response_model=MovementRead, status_code=201)
