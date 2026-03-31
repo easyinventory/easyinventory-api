@@ -31,9 +31,6 @@ docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" pull api
 echo "Restarting api container"
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d api
 
-echo "Running database migrations"
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T api alembic upgrade head
-
 echo "Pruning dangling images"
 docker image prune -f
 
