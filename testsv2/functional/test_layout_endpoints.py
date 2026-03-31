@@ -40,7 +40,9 @@ async def test_create_layout_version_returns_201(
 ) -> None:
     """Owner can create a layout version; response is 201 with correct payload."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
 
     response = await client.post(
@@ -67,7 +69,9 @@ async def test_create_layout_version_increments_version_number(
 ) -> None:
     """Second version gets version_number 2."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
 
     await client.post(
@@ -93,7 +97,9 @@ async def test_create_layout_version_rejects_rows_below_minimum(
 ) -> None:
     """rows < 2 returns 422 Unprocessable Entity."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
 
     response = await client.post(
@@ -113,7 +119,9 @@ async def test_create_layout_version_rejects_cols_above_maximum(
 ) -> None:
     """cols > 30 returns 422 Unprocessable Entity."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
 
     response = await client.post(
@@ -133,7 +141,9 @@ async def test_create_layout_version_forbidden_for_viewer(
 ) -> None:
     """Viewer role cannot create a layout version; returns 403."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.VIEWER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.VIEWER
+    )
     store = await create_store(db, org_id=org.id)
 
     response = await client.post(
@@ -156,10 +166,16 @@ async def test_activate_sets_version_active_and_deactivates_others(
 ) -> None:
     """Activating one version deactivates all others for the same store."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
-    v1 = await create_layout_version(db, store_id=store.id, version_number=1, is_active=True)
-    v2 = await create_layout_version(db, store_id=store.id, version_number=2, is_active=False)
+    v1 = await create_layout_version(
+        db, store_id=store.id, version_number=1, is_active=True
+    )
+    v2 = await create_layout_version(
+        db, store_id=store.id, version_number=2, is_active=False
+    )
 
     response = await client.post(
         f"/api/stores/{store.id}/layouts/{v2.id}/activate",
@@ -191,7 +207,9 @@ async def test_activate_unknown_layout_returns_404(
     import uuid
 
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store = await create_store(db, org_id=org.id)
 
     response = await client.post(
@@ -213,7 +231,9 @@ async def test_get_active_layout_returns_active_version(
 ) -> None:
     """Returns the active layout version with an empty zones list."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE
+    )
     store = await create_store(db, org_id=org.id)
     active = await create_layout_version(
         db, store_id=store.id, version_number=1, rows=4, cols=6, is_active=True
@@ -241,10 +261,14 @@ async def test_get_active_layout_returns_404_when_none_active(
 ) -> None:
     """Returns 404 when no layout version is active for the store."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE
+    )
     store = await create_store(db, org_id=org.id)
     # Create an inactive version only
-    await create_layout_version(db, store_id=store.id, version_number=1, is_active=False)
+    await create_layout_version(
+        db, store_id=store.id, version_number=1, is_active=False
+    )
 
     response = await client.get(
         f"/api/stores/{store.id}/layouts/active",
@@ -265,7 +289,9 @@ async def test_list_layout_versions_ordered_by_version_number(
 ) -> None:
     """Returns all versions ordered ascending by version_number."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE
+    )
     store = await create_store(db, org_id=org.id)
     # Insert out of order to verify sorting
     await create_layout_version(db, store_id=store.id, version_number=3)
@@ -290,7 +316,9 @@ async def test_list_layout_versions_empty(
 ) -> None:
     """Returns an empty list when the store has no layout versions."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.EMPLOYEE
+    )
     store = await create_store(db, org_id=org.id)
 
     response = await client.get(
@@ -310,7 +338,9 @@ async def test_list_layout_versions_scoped_to_store(
 ) -> None:
     """Versions from other stores are not included."""
     org = await create_org(db)
-    await create_membership(db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
     store_a = await create_store(db, org_id=org.id, name="Store A")
     store_b = await create_store(db, org_id=org.id, name="Store B")
     target = await create_layout_version(db, store_id=store_a.id, version_number=1)

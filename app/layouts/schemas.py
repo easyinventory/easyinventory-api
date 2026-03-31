@@ -1,4 +1,5 @@
 """Pydantic schemas for LayoutVersion."""
+
 from __future__ import annotations
 
 import uuid

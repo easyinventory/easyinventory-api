@@ -1,4 +1,5 @@
 """Service layer for LayoutVersion CRUD operations."""
+
 from __future__ import annotations
 
 import uuid
@@ -18,9 +19,9 @@ async def create_layout_version(
 ) -> LayoutVersion:
     """Create a new layout version with an auto-incremented version_number."""
     # Compute next version_number as MAX(version_number) + 1, starting at 1
-    subq = select(
-        func.coalesce(func.max(LayoutVersion.version_number), 0) + 1
-    ).where(LayoutVersion.store_id == store_id)
+    subq = select(func.coalesce(func.max(LayoutVersion.version_number), 0) + 1).where(
+        LayoutVersion.store_id == store_id
+    )
     result = await db.execute(subq)
     next_version = result.scalar_one()
 
@@ -79,12 +80,9 @@ async def get_active_layout(
     """Return the currently active layout version for the store."""
     # TODO(BE-07): add .options(selectinload(LayoutVersion.zones)) once the Zone
     #              model and relationship are introduced in the zones-cellset PR.
-    stmt = (
-        select(LayoutVersion)
-        .where(
-            LayoutVersion.store_id == store_id,
-            LayoutVersion.is_active == True,  # noqa: E712
-        )
+    stmt = select(LayoutVersion).where(
+        LayoutVersion.store_id == store_id,
+        LayoutVersion.is_active == True,  # noqa: E712
     )
     result = await db.execute(stmt)
     layout = result.scalar_one_or_none()

@@ -1,4 +1,5 @@
 """Routes for LayoutVersion CRUD operations."""
+
 from __future__ import annotations
 
 import uuid
