@@ -17,6 +17,7 @@ Complete reference for every endpoint in the EasyInventory API. All routes retur
 - [Suppliers](#suppliers)
 - [Products](#products)
 - [Product–Supplier Links](#productsupplier-links)
+- [Stores](#stores)
 - [Admin: Organizations](#admin-organizations)
 - [Admin: Users](#admin-users)
 - [Invite Flow Details](#invite-flow-details)
@@ -611,6 +612,68 @@ Permanently removes a supplier link from a product.
 
 ---
 
+## Stores
+
+All store endpoints are org-scoped. Stores represent physical or logical locations within an organization (e.g., a warehouse or retail outlet). Every organization automatically has a default store created when it is first provisioned.
+
+### `GET /api/stores`
+
+Lists all active stores for the current organization.
+
+**Auth:** Required — any org member  
+**Response** `200`
+
+```json
+[
+  {
+    "id": "store-uuid",
+    "org_id": "org-uuid",
+    "name": "Acme Corporation Default Store",
+    "is_active": true,
+    "created_at": "2024-01-15T10:30:00Z",
+    "updated_at": "2024-01-15T10:30:00Z"
+  }
+]
+```
+
+---
+
+### `POST /api/stores`
+
+Creates a new store within the current organization.
+
+**Auth:** Required — `ORG_OWNER`  
+**Request Body**
+
+```json
+{
+  "name": "Downtown Warehouse"
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string (min length 1) | Yes | Store name |
+
+**Response** `201`
+
+```json
+{
+  "id": "store-uuid",
+  "org_id": "org-uuid",
+  "name": "Downtown Warehouse",
+  "is_active": true,
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+
+**Errors:**
+- `403` — Caller is not the org owner.
+- `422` — Missing or empty `name`.
+
+---
+
 ## Admin: Organizations
 
 System-admin endpoints for managing organizations globally. All endpoints require `SYSTEM_ADMIN` system role.
@@ -662,6 +725,8 @@ Creates a new organization and assigns an owner. If the owner email doesn't exis
   "member_count": 1
 }
 ```
+
+> **Note:** Creating an organization automatically creates a default store named `"<Org Name> Default Store"` for that org.
 
 ---
 

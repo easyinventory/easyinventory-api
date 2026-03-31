@@ -61,6 +61,12 @@ easyinventory-api/
 │   │   ├── schemas.py           #   Product Pydantic schemas
 │   │   └── service.py           #   Product data access
 │   │
+│   ├── stores/                  # Stores domain
+│   │   ├── deps.py              #   get_store_from_path path dependency
+│   │   ├── routes.py            #   Store CRUD endpoints
+│   │   ├── schemas.py           #   Store Pydantic schemas
+│   │   └── service.py           #   Store data access
+│   │
 │   ├── suppliers/               # Suppliers domain
 │   │   ├── routes.py            #   Supplier CRUD endpoints
 │   │   ├── schemas.py           #   Supplier Pydantic schemas
@@ -86,7 +92,8 @@ easyinventory-api/
 │       ├── org_membership.py    #   OrgMembership (user <-> org, role, active status)
 │       ├── supplier.py          #   Supplier (org-scoped, contact info)
 │       ├── product.py           #   Product (org-scoped, SKU, category)
-│       └── product_supplier.py  #   ProductSupplier join table (is_active flag)
+│       ├── product_supplier.py  #   ProductSupplier join table (is_active flag)
+│       └── store.py             #   Store (org-scoped, is_active, updated_at)
 │
 ├── alembic/                     # Database migration infrastructure
 │   ├── env.py                   #   Async migration runner (reads DATABASE_URL)
@@ -100,7 +107,8 @@ easyinventory-api/
 ├── testsv2/                     # Test suite 2: real database (transaction-per-test rollback)
 │   ├── conftest.py              #   DB engine, session, transaction rollback fixtures
 │   ├── factories.py             #   Factory functions that INSERT real rows
-│   ├── integration/             #   Service-layer tests against real Postgres
+│   ├── unit/                    #   Service-layer tests against real Postgres
+│   ├── integration/             #   (reserved for multi-service integration tests)
 │   └── functional/              #   HTTP endpoint tests against real Postgres
 │       └── conftest.py          #   Auth bypass fixture (no Cognito needed in tests)
 │
@@ -431,33 +439,36 @@ All ORM models inherit from `BaseModel` (defined in `app/models/base.py`), which
 │   User   │────<│ OrgMembership │>────│ Organization │
 └──────────┘     └───────────────┘     └──────────────┘
                                               │
-                              ┌───────────────┼───────────────┐
-                              │               │               │
-                        ┌─────▼────┐   ┌──────▼─────┐        │
-                        │ Supplier │   │  Product   │        │
-                        └─────┬────┘   └──────┬─────┘        │
-                              │               │               │
-                              └──────┐ ┌──────┘               │
-                              ┌──────▼─▼──────┐               │
-                              │ProductSupplier│               │
-                              └───────────────┘               │
+                      ┌───────────────────────┼───────────────┐
+                      │               │               │       │
+                ┌─────▼────┐   ┌──────▼─────┐   ┌────▼─────┐  │
+                │ Supplier │   │  Product   │   │  Store   │  │
+                └─────┬────┘   └──────┬─────┘   └──────────┘  │
+                      │               │                        │
+                      └──────┐ ┌──────┘                        │
+                      ┌──────▼─▼──────┐                        │
+                      │ProductSupplier│                        │
+                      └───────────────┘                        │
 ```
 
 | Model | Table | Key Fields | Relations |
 |---|---|---|---|
 | `User` | `users` | `cognito_sub` (unique), `email`, `system_role`, `is_active` | → `OrgMembership` (one-to-many) |
-| `Organization` | `organizations` | `name` | → `OrgMembership` (one-to-many) |
+| `Organization` | `organizations` | `name` | → `OrgMembership` (one-to-many), `Store` (one-to-many) |
 | `OrgMembership` | `org_memberships` | `org_id` (FK), `user_id` (FK), `org_role`, `is_active` | → `User`, `Organization` |
 | `Supplier` | `suppliers` | `org_id` (FK), `name`, `contact_name`, `contact_email`, `contact_phone`, `notes` | — |
 | `Product` | `products` | `org_id` (FK), `name`, `description`, `sku`, `category` | → `ProductSupplier` (one-to-many) |
 | `ProductSupplier` | `product_suppliers` | `product_id` (FK), `supplier_id` (FK), `is_active` | → `Supplier` / Unique on `(product_id, supplier_id)` |
+| `Store` | `stores` | `org_id` (FK, CASCADE), `name`, `is_active`, `updated_at` | — |
 
 ### Key design decisions
 
 - **UUIDs as primary keys** — Every model uses UUIDs instead of auto-incrementing integers. This prevents ID enumeration attacks and makes it safe to expose IDs in URLs.
-- **Org-scoping via foreign key** — Business data models (`Supplier`, `Product`) have an `org_id` foreign key. This is the foundation of multi-tenancy.
+- **Org-scoping via foreign key** — Business data models (`Supplier`, `Product`, `Store`) have an `org_id` foreign key. This is the foundation of multi-tenancy.
 - **Soft state on memberships** — `OrgMembership.is_active` allows deactivating members without deleting their data. They can be reactivated later.
+- **Soft state on stores** — `Store.is_active` allows deactivating stores without deleting them or their future inventory records.
 - **Join table with metadata** — `ProductSupplier` is not just a simple many-to-many join. It has an `is_active` flag, allowing you to deactivate a specific product-supplier relationship without removing it.
+- **Cascade deletes** — `Store.org_id` is defined with `ondelete="CASCADE"`, so all stores are deleted automatically when their parent organization is deleted.
 
 ---
 
@@ -595,9 +606,12 @@ If `BOOTSTRAP_ADMIN_EMAIL` is configured in `.env`:
 
 1. **Creates a user** with that email (as a placeholder if they haven't signed up via Cognito yet).
 2. **Creates an organization** named per `BOOTSTRAP_ORG_NAME` (defaults to "Default Organization").
-3. **Makes the user the `ORG_OWNER`** of that organization.
-4. **Promotes the user to `SYSTEM_ADMIN`** system role.
-5. **Seeds sample data** — suppliers, products, and product-supplier links (defined in `app/bootstrap/seed_data.py`).
+3. **Auto-creates a default store** named `"<Org Name> Default Store"` for that organization.
+4. **Makes the user the `ORG_OWNER`** of that organization.
+5. **Promotes the user to `SYSTEM_ADMIN`** system role.
+6. **Seeds sample data** — suppliers, products, and product-supplier links (defined in `app/bootstrap/seed_data.py`).
+
+> **Note:** The same auto-store logic runs whenever any organization is created (via `POST /api/admin/orgs` or bootstrap). New organizations always start with one default store.
 
 ### Sample seed data
 

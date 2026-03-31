@@ -75,9 +75,7 @@ async def create_org(
     If the owner email is unknown, creates a Cognito account
     (sends invite email) and a placeholder user.
     """
-    org = Organization(name=body.name)
-    db.add(org)
-    await db.flush()
+    org = await org_service.create_organization(db, body.name)
 
     await invite_user_to_org(
         db=db,
