@@ -10,9 +10,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt gunicorn uvicorn
 
 COPY . .
+RUN chmod +x entrypoint.prod.sh
 
 EXPOSE 8000
 
+ENTRYPOINT ["./entrypoint.prod.sh"]
 CMD ["gunicorn", "app.main:app", \
      "-w", "2", \
      "-k", "uvicorn.workers.UvicornWorker", \
