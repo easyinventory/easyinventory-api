@@ -23,6 +23,7 @@ from app.store_inventory.service import (
     list_inventory,
     update_entry,
 )
+from app.models.store_inventory import StoreInventory
 
 router = APIRouter(prefix="/api/stores/{store_id}/inventory", tags=["store-inventory"])
 
@@ -36,7 +37,7 @@ async def stock_product(
     data: StoreInventoryCreate,
     store: Store = Depends(get_store_from_path),
     db: AsyncSession = Depends(get_db),
-) -> StoreInventoryRead:
+) -> StoreInventory:
     """Add a product to this store's inventory."""
     entry = await add_product(
         db,
@@ -47,17 +48,16 @@ async def stock_product(
         low_stock_threshold=data.low_stock_threshold,
     )
     await db.commit()
-    return StoreInventoryRead.model_validate(entry)
+    return entry
 
 
 @router.get("", response_model=list[StoreInventoryRead])
 async def get_store_inventory(
     store: Store = Depends(get_store_from_path),
     db: AsyncSession = Depends(get_db),
-) -> list[StoreInventoryRead]:
+) -> list[StoreInventory]:
     """List all inventory entries for this store."""
-    entries = await list_inventory(db, store_id=store.id)
-    return [StoreInventoryRead.model_validate(e) for e in entries]
+    return await list_inventory(db, store_id=store.id)
 
 
 @router.get("/{entry_id}", response_model=StoreInventoryRead)
@@ -65,10 +65,9 @@ async def get_inventory_entry(
     entry_id: uuid.UUID,
     store: Store = Depends(get_store_from_path),
     db: AsyncSession = Depends(get_db),
-) -> StoreInventoryRead:
+) -> StoreInventory:
     """Get a single inventory entry."""
-    entry = await get_entry(db, entry_id=entry_id, store_id=store.id)
-    return StoreInventoryRead.model_validate(entry)
+    return await get_entry(db, entry_id=entry_id, store_id=store.id)
 
 
 @router.patch("/{entry_id}", response_model=StoreInventoryRead)
@@ -77,7 +76,7 @@ async def update_inventory_entry(
     data: StoreInventoryUpdate,
     store: Store = Depends(get_store_from_path),
     db: AsyncSession = Depends(get_db),
-) -> StoreInventoryRead:
+) -> StoreInventory:
     """Partially update an inventory entry."""
     entry = await update_entry(
         db,
@@ -88,7 +87,7 @@ async def update_inventory_entry(
         low_stock_threshold=data.low_stock_threshold,
     )
     await db.commit()
-    return StoreInventoryRead.model_validate(entry)
+    return entry
 
 
 @router.delete("/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)

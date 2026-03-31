@@ -24,7 +24,6 @@ from testsv2.factories import (
     create_store_inventory,
 )
 
-
 # ── add_product ───────────────────────────────────────────────────────────────
 
 
@@ -145,9 +144,7 @@ async def test_get_entry_wrong_store_raises_not_found(db: AsyncSession) -> None:
     store_a = await create_store(db, org_id=org.id, name="Store A")
     store_b = await create_store(db, org_id=org.id, name="Store B")
     product = await create_product(db, org_id=org.id)
-    entry = await create_store_inventory(
-        db, store_id=store_a.id, product_id=product.id
-    )
+    entry = await create_store_inventory(db, store_id=store_a.id, product_id=product.id)
 
     with pytest.raises(NotFound):
         await get_entry(db, entry_id=entry.id, store_id=store_b.id)

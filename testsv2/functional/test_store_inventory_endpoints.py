@@ -128,9 +128,7 @@ async def test_list_inventory_empty(
     )
     store = await create_store(db, org_id=org.id)
 
-    response = await client.get(
-        _inventory_url(store.id), headers=_org_headers(org.id)
-    )
+    response = await client.get(_inventory_url(store.id), headers=_org_headers(org.id))
 
     assert response.status_code == 200
     assert response.json() == []
@@ -157,9 +155,7 @@ async def test_list_inventory_returns_entries(
         db, store_id=store.id, product_id=product_b.id, quantity=8.0
     )
 
-    response = await client.get(
-        _inventory_url(store.id), headers=_org_headers(org.id)
-    )
+    response = await client.get(_inventory_url(store.id), headers=_org_headers(org.id))
 
     assert response.status_code == 200
     product_ids = {e["product_id"] for e in response.json()}
