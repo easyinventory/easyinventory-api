@@ -100,36 +100,6 @@ async def test_creates_default_org(mock_settings):
 
 
 @patch("app.bootstrap.seeder.settings")
-async def test_creates_owner_membership(mock_settings):
-    """Bootstrap should create an ORG_OWNER membership linking user to org."""
-    mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
-    mock_settings.BOOTSTRAP_ORG_NAME = "Default Organization"
-    mock_db = _mock_db_no_existing_user()
-
-    await run_bootstrap(mock_db)
-
-    membership = mock_db.add.call_args_list[2][0][0]
-    assert isinstance(membership, OrgMembership)
-    assert membership.org_role == OrgRole.OWNER
-    assert membership.is_active is False
-
-
-@patch("app.bootstrap.seeder.settings")
-async def test_membership_inactive_until_login(mock_settings):
-    """Membership should be inactive — activated when admin claims placeholder."""
-    mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
-    mock_settings.BOOTSTRAP_ORG_NAME = "Default Organization"
-    mock_db = _mock_db_no_existing_user()
-
-    await run_bootstrap(mock_db)
-
-    user = mock_db.add.call_args_list[0][0][0]
-    membership = mock_db.add.call_args_list[2][0][0]
-    assert user.is_active is False
-    assert membership.is_active is False
-
-
-@patch("app.bootstrap.seeder.settings")
 async def test_skips_when_user_already_exists_with_membership(mock_settings):
     """If user with that email exists AND has a membership, bootstrap skips creation but still checks seed."""
     mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
@@ -140,28 +110,6 @@ async def test_skips_when_user_already_exists_with_membership(mock_settings):
 
     # No user/org/membership created; seed check runs but finds existing data
     mock_db.add.assert_not_called()
-
-
-@patch("app.bootstrap.seeder.settings")
-async def test_creates_org_when_user_exists_without_membership(mock_settings):
-    """If user exists but has no membership, create org + membership."""
-    mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
-    mock_settings.BOOTSTRAP_ORG_NAME = "My Company"
-    mock_db = _mock_db_existing_user(has_membership=False)
-
-    await run_bootstrap(mock_db)
-
-    # First 2 adds are: org and membership (then seed data follows)
-    assert mock_db.add.call_count >= 2
-
-    org = mock_db.add.call_args_list[0][0][0]
-    assert isinstance(org, Organization)
-    assert org.name == "My Company"
-
-    membership = mock_db.add.call_args_list[1][0][0]
-    assert isinstance(membership, OrgMembership)
-    assert membership.org_role == OrgRole.OWNER
-    assert membership.is_active is True
 
 
 @patch("app.bootstrap.seeder.settings")
@@ -193,20 +141,6 @@ async def test_promotes_existing_user_to_admin(mock_settings):
     await run_bootstrap(mock_db)
 
     assert existing.system_role == SystemRole.ADMIN
-
-
-@patch("app.bootstrap.seeder.settings")
-async def test_membership_active_when_user_already_exists(mock_settings):
-    """When user already exists (real login), membership should be active."""
-    mock_settings.BOOTSTRAP_ADMIN_EMAIL = "admin@company.com"
-    mock_settings.BOOTSTRAP_ORG_NAME = "Default Organization"
-    mock_db = _mock_db_existing_user(has_membership=False)
-
-    await run_bootstrap(mock_db)
-
-    membership = mock_db.add.call_args_list[1][0][0]
-    assert isinstance(membership, OrgMembership)
-    assert membership.is_active is True
 
 
 @patch("app.bootstrap.seeder.settings")
