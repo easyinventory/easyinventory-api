@@ -21,7 +21,7 @@ from collections.abc import AsyncGenerator
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     create_async_engine,
@@ -62,6 +62,15 @@ async def setup_database():
     yield
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+        # Reset the Alembic version stamp so the next ``alembic upgrade head``
+        # replays all migrations from scratch instead of only running the
+        # latest one against a now-empty database.
+        await conn.execute(text("DROP TABLE IF EXISTS alembic_version"))
+        # Drop custom Postgres enum types that are not removed by drop_all
+        # (SQLAlchemy only drops tables, not standalone types).  Without this,
+        # the next ``alembic upgrade head`` would fail with
+        # "type already exists" when recreating the enum.
+        await conn.execute(text("DROP TYPE IF EXISTS movement_type"))
     await test_engine.dispose()
 
 

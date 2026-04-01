@@ -78,6 +78,11 @@ easyinventory-api/
 │   │   ├── schemas.py           #   ZoneCreate / ZoneUpdate / ZoneRead schemas
 │   │   └── service.py           #   Zone data access (create, list, get, update, delete)
 │   │
+│   ├── store_inventory/         # Store inventory domain
+│   │   ├── routes.py            #   Inventory CRUD + receipt/sale + placement endpoints (store-scoped)
+│   │   ├── schemas.py           #   StoreInventory schemas + MovementRead / RecordReceiptRequest / RecordSaleRequest + AssignZoneRequest / PlacementRead
+│   │   └── service.py           #   Inventory data access + record_receipt / record_sale + assign_zone / get_placement_history / remove_from_zone
+│   │
 │   ├── suppliers/               # Suppliers domain
 │   │   ├── routes.py            #   Supplier CRUD endpoints
 │   │   ├── schemas.py           #   Supplier Pydantic schemas
@@ -106,7 +111,11 @@ easyinventory-api/
 │       ├── product_supplier.py  #   ProductSupplier join table (is_active flag)
 │       ├── store.py             #   Store (org-scoped, is_active, updated_at)
 │       ├── layout_version.py    #   LayoutVersion (store-scoped, version_number, rows, cols, is_active)
-│       └── zone.py              #   Zone (layout-version-scoped, name, color, cells JSON)
+│       ├── store_inventory.py   #   StoreInventory (store + product link, quantity, unit_price, low-stock threshold)
+│       ├── inventory_movement.py #  InventoryMovement (audit trail of receipts/sales; MovementType enum)
+│       ├── inventory_placement.py # InventoryPlacement (zone assignment history; started_at / zone_name / duration_display computed helpers)
+│       ├── zone.py              #   Zone (layout-version-scoped, name, color, cells JSON)
+│       └── fixture.py           #   Fixture (layout-version-scoped, product reference, type, cell position)
 │
 ├── alembic/                     # Database migration infrastructure
 │   ├── env.py                   #   Async migration runner (reads DATABASE_URL)
@@ -451,17 +460,44 @@ All ORM models inherit from `BaseModel` (defined in `app/models/base.py`), which
 ┌──────────┐     ┌───────────────┐     ┌──────────────┐
 │   User   │────<│ OrgMembership │>────│ Organization │
 └──────────┘     └───────────────┘     └──────────────┘
-                                              │
-                      ┌───────────────────────┼───────────────┐
-                      │               │               │       │
-                ┌─────▼────┐   ┌──────▼─────┐   ┌────▼─────┐  │
-                │ Supplier │   │  Product   │   │  Store   │  │
-                └─────┬────┘   └──────┬─────┘   └──────────┘  │
-                      │               │                        │
-                      └──────┐ ┌──────┘                        │
-                      ┌──────▼─▼──────┐                        │
-                      │ProductSupplier│                        │
-                      └───────────────┘                        │
+      │                                       │
+      │                   ┌───────────────────┼───────────────┐
+      │                   │               │               │       │
+      │             ┌─────▼────┐   ┌──────▼─────┐   ┌────▼─────┐
+      │             │ Supplier │   │  Product   │   │  Store   │
+      │             └─────┬────┘   └──────┬──┬──┘   └────┬──┬──┘
+      │                   │               │  │            │  │
+      │                   └──────┐ ┌──────┘  └────┐  ┌───┘  │
+      │             ┌────────────▼─▼────────┐  ┌──▼──▼──────────────┐
+      │             │  ProductSupplier      │  │   StoreInventory   │
+      │             └───────────────────────┘  └─────────┬──────────┘
+      │                                                   │
+      └───────────────────────────────────────────────────┤
+                                              ┌────────────▼──────────┐
+                                              │  InventoryMovement    │
+                                              │  (type, qty,          │
+                                              │   unit_cost/price,    │
+                                              │   performed_by_user)  │
+                                              └───────────────────────┘
+
+                                              ┌────────────▼──────────┐
+                                              │  InventoryPlacement   │
+                                              │  (zone_id FK,         │
+                                              │   ended_at nullable,  │
+                                              │   placed_by_user)     │
+                                              └────────────┬──────────┘
+                                                           │
+                                                      ┌────▼────┐
+                                                      │  Zone   │
+                                                      └─────────┘
+
+                                          ┌───────────────┐
+                                          │LayoutVersion  │
+                                          └────┬──────────┘
+                                               │
+                                          ┌────▼────┐
+                                          │  Zone   │
+                                          └─────────┘
 ```
 
 | Model | Table | Key Fields | Relations |
@@ -470,9 +506,12 @@ All ORM models inherit from `BaseModel` (defined in `app/models/base.py`), which
 | `Organization` | `organizations` | `name` | → `OrgMembership` (one-to-many), `Store` (one-to-many) |
 | `OrgMembership` | `org_memberships` | `org_id` (FK), `user_id` (FK), `org_role`, `is_active` | → `User`, `Organization` |
 | `Supplier` | `suppliers` | `org_id` (FK), `name`, `contact_name`, `contact_email`, `contact_phone`, `notes` | — |
-| `Product` | `products` | `org_id` (FK), `name`, `description`, `sku`, `category` | → `ProductSupplier` (one-to-many) |
+| `Product` | `products` | `org_id` (FK), `name`, `description`, `sku`, `category` | → `ProductSupplier` (one-to-many), → `StoreInventory` (one-to-many) |
 | `ProductSupplier` | `product_suppliers` | `product_id` (FK), `supplier_id` (FK), `is_active` | → `Supplier` / Unique on `(product_id, supplier_id)` |
-| `Store` | `stores` | `org_id` (FK, CASCADE), `name`, `is_active`, `updated_at` | → `LayoutVersion` (one-to-many) |
+| `Store` | `stores` | `org_id` (FK, CASCADE), `name`, `is_active`, `updated_at` | → `LayoutVersion` (one-to-many), → `StoreInventory` (one-to-many) |
+| `StoreInventory` | `store_inventory` | `store_id` (FK, CASCADE), `product_id` (FK, CASCADE), `quantity`, `unit_price`, `low_stock_threshold`, `updated_at` | → `Store`, → `Product`; unique on `(store_id, product_id)` |
+| `InventoryMovement` | `inventory_movements` | `store_inventory_id` (FK, CASCADE), `movement_type` (enum: `receipt`/`sale`), `quantity`, `unit_cost`, `unit_price`, `reference_number`, `notes`, `performed_by_user_id` (FK, RESTRICT) | → `StoreInventory`, → `User` |
+| `InventoryPlacement` | `inventory_placements` | `store_inventory_id` (FK, CASCADE), `zone_id` (FK, CASCADE), `ended_at` (nullable — NULL means active), `placed_by_user_id` (FK, RESTRICT) | → `StoreInventory`, → `Zone`, → `User`; partial unique index on `(store_inventory_id)` WHERE `ended_at IS NULL` |
 | `LayoutVersion` | `layout_versions` | `store_id` (FK, CASCADE), `version_number`, `rows`, `cols`, `is_active`, `updated_at` | → `Zone` (one-to-many); unique on `(store_id, version_number)` |
 | `Zone` | `zones` | `layout_version_id` (FK, CASCADE), `name`, `color`, `cells` (JSON), `updated_at` | → `LayoutVersion` |
 
@@ -486,6 +525,14 @@ All ORM models inherit from `BaseModel` (defined in `app/models/base.py`), which
 - **Cascade deletes** — `Store.org_id` is defined with `ondelete="CASCADE"`, so all stores are deleted automatically when their parent organization is deleted.
 - **Layout versioning** — `LayoutVersion` models a point-in-time grid configuration for a store. Versions are immutable once created (grid dimensions cannot be changed), and only one may be `is_active=True` at a time. The `activate` endpoint uses a bulk `UPDATE … SET is_active=False` across the store, then a targeted `UPDATE … SET is_active=True` on the target, making activation atomic within the transaction.
 - **Zone cell storage** — A zone's claimed cells are stored as a JSON array of `{"row": int, "col": int}` objects rather than a normalised join table. This avoids a third table for what is effectively a small, denormalised blob that is always read and written as a unit. Cell-level validation (bounds check, intra-request duplicate check, cross-zone overlap detection) happens in the service layer before the row is written.
+- **Inventory conditional join** — `list_inventory` only joins the `products` table when `search` or `category` predicates are present. For the common unfiltered case the query stays on `store_inventory` alone and a `selectinload` fetches associated product rows efficiently via a separate IN-clause query. This avoids an unnecessary join for every basic list request.
+- **Stable inventory pagination** — The inventory list is ordered by `(created_at, id)`. The secondary `id` sort key ensures deterministic OFFSET/LIMIT pagination when multiple entries share the same `created_at` timestamp (which can happen when items are inserted in the same transaction).
+- **Inventory product contract** — The `product` field on `StoreInventoryRead` is non-optional (`ProductSummary`, not `ProductSummary | None`). The `product_id` FK is `NOT NULL` and `get_entry` always uses `selectinload`, so a missing product would indicate a data integrity failure rather than an expected empty state.
+- **Inventory movements as an append-only audit trail** — `InventoryMovement` rows are never updated or deleted. Every stock change (receipt or sale) creates a new row, giving a complete history of when stock changed, by how much, at what cost/price, with which reference number, and which user initiated it. `performed_by_user_id` uses `ondelete="RESTRICT"` to prevent deleting a user whose movement records exist. `store_inventory_id` uses `ondelete="CASCADE"` so movements are cleaned up with their parent inventory entry.
+- **Sale validation prevents negative stock** — `record_sale` checks `inventory.quantity >= data.quantity` before writing. If insufficient stock is available it raises an `AppError(400)` before any database write occurs, so no partial state is created.
+- **Zone placement as a temporal history** — `InventoryPlacement` records where on the shop floor an inventory item is (or was) located. `ended_at IS NULL` means the item is currently in that zone. Assigning to a new zone closes all previous active placements in a single explicit `db.flush()` before inserting the new row, ensuring the partial unique index on `(store_inventory_id) WHERE ended_at IS NULL` is never violated within the same transaction.
+- **Single-active-placement enforced at DB level** — A partial unique index (`uix_inventory_placements_active`) on `inventory_placements(store_inventory_id) WHERE ended_at IS NULL` prevents concurrent requests from creating two active placements for the same item. The service validates and closes all active rows defensively (in case of historical inconsistency) and flushes updates before the insert.
+- **Placement `duration_display` as a computed model property** — The human-readable duration (e.g. `"2 days, 3 hrs"`) is derived from `created_at` and `ended_at` in Python via a standalone `compute_duration_display()` function called by the `@property`. This avoids a DB-level computed column and keeps the logic easily testable without a database session.
 
 ---
 
