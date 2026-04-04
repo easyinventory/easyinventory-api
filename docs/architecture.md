@@ -83,6 +83,11 @@ easyinventory-api/
 │   │   ├── schemas.py           #   StoreInventory schemas + MovementRead / RecordReceiptRequest / RecordSaleRequest + AssignZoneRequest / PlacementRead
 │   │   └── service.py           #   Inventory data access + record_receipt / record_sale + assign_zone / get_placement_history / remove_from_zone
 │   │
+│   ├── analytics/               # Analytics domain (cross-model aggregations)
+│   │   ├── routes.py            #   GET /api/stores/{store_id}/analytics/zone-inventory-summary
+│   │   ├── schemas.py           #   ZoneInventorySummaryResponse, ZoneInventorySummary, FixtureSummary, UnzonedSummary, etc.
+│   │   └── service.py           #   Aggregate queries joining layouts, zones, fixtures, inventory, and placements
+│   │
 │   ├── suppliers/               # Suppliers domain
 │   │   ├── routes.py            #   Supplier CRUD endpoints
 │   │   ├── schemas.py           #   Supplier Pydantic schemas
