@@ -264,6 +264,9 @@ async def record_receipt(
     if not inventory:
         raise NotFound(f"Inventory entry {inventory_id} not found in store {store_id}")
 
+    # Capture the current zone (if any) from the active placement.
+    current_zone_id = await _get_active_zone_id(db, inventory_id)
+
     movement = InventoryMovement(
         store_inventory_id=inventory_id,
         movement_type=MovementType.RECEIPT,
@@ -272,6 +275,7 @@ async def record_receipt(
         reference_number=data.reference_number,
         notes=data.notes,
         performed_by_user_id=user_id,
+        zone_id=current_zone_id,
     )
     db.add(movement)
 
@@ -315,6 +319,9 @@ async def record_sale(
             f"Insufficient stock: {inventory.quantity} available, {data.quantity} requested"
         )
 
+    # Capture the current zone (if any) from the active placement.
+    current_zone_id = await _get_active_zone_id(db, inventory_id)
+
     movement = InventoryMovement(
         store_inventory_id=inventory_id,
         movement_type=MovementType.SALE,
@@ -323,6 +330,7 @@ async def record_sale(
         reference_number=data.reference_number,
         notes=data.notes,
         performed_by_user_id=user_id,
+        zone_id=current_zone_id,
     )
     db.add(movement)
 
@@ -331,6 +339,22 @@ async def record_sale(
     await db.flush()
     await db.refresh(movement)
     return movement
+
+
+async def _get_active_zone_id(
+    db: AsyncSession,
+    inventory_id: uuid.UUID,
+) -> uuid.UUID | None:
+    """Return the zone_id from the active placement for an inventory item, or None."""
+    result = await db.execute(
+        select(InventoryPlacement.zone_id).where(
+            and_(
+                InventoryPlacement.store_inventory_id == inventory_id,
+                InventoryPlacement.ended_at.is_(None),
+            )
+        )
+    )
+    return result.scalar_one_or_none()
 
 
 async def list_movements(

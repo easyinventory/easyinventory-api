@@ -102,6 +102,8 @@ class MovementRead(BaseModel):
     reference_number: str | None
     notes: str | None
     performed_by_user_id: uuid.UUID
+    zone_id: uuid.UUID | None = None
+    zone_name: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
