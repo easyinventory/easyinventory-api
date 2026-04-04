@@ -23,6 +23,7 @@ Complete reference for every endpoint in the EasyInventory API. All routes retur
 - [Inventory Placements](#inventory-placements)
 - [Layout Versions](#layout-versions)
 - [Zones](#zones)
+- [Analytics](#analytics)
 - [Admin: Organizations](#admin-organizations)
 - [Admin: Users](#admin-users)
 - [Invite Flow Details](#invite-flow-details)
@@ -1377,6 +1378,83 @@ Deletes a zone.
 **Errors:**
 - `403` — Caller is not `ORG_OWNER` or `ORG_ADMIN`.
 - `404` — Zone, layout version, or store not found in the current org.
+
+---
+
+## Analytics
+
+Aggregate data endpoints for dashboards and heatmaps. Analytics endpoints read across multiple domain models (layouts, zones, fixtures, inventory, placements) and return pre-computed summaries.
+
+### `GET /api/stores/{store_id}/analytics/zone-inventory-summary`
+
+Returns per-zone inventory stock data for the store's active layout. Powers the **Inventory Heatmap** view — each zone includes aggregate stock counts, a health ratio, and a list of individual inventory items with their current stock status.
+
+**Auth:** Required — any org member  
+**Path Params:**
+
+| Param | Type | Description |
+|---|---|---|
+| `store_id` | UUID | The store to query |
+
+**Response** `200`
+
+```json
+{
+  "layout_id": "uuid",
+  "layout_version": 1,
+  "rows": 10,
+  "cols": 8,
+  "zones": [
+    {
+      "zone_id": "uuid",
+      "zone_name": "Zone A",
+      "zone_color": "#4A90D9",
+      "cells": [{"row": 0, "col": 0}, {"row": 0, "col": 1}],
+      "total_items": 5,
+      "total_quantity": 120,
+      "low_stock_count": 1,
+      "out_of_stock_count": 0,
+      "items": [
+        {
+          "inventory_id": "uuid",
+          "product_name": "Widget A",
+          "sku": "WA-001",
+          "category": "Widgets",
+          "quantity": 25,
+          "low_stock_threshold": 10,
+          "unit_price": "4.9900",
+          "stock_status": "ok"
+        }
+      ]
+    }
+  ],
+  "fixtures": [
+    {
+      "fixture_id": "uuid",
+      "fixture_name": "North Exit",
+      "fixture_type": "DOOR",
+      "cells": [{"row": 0, "col": 3}]
+    }
+  ],
+  "unzoned_summary": {
+    "total_items": 2,
+    "total_quantity": 50,
+    "low_stock_count": 1,
+    "out_of_stock_count": 0
+  }
+}
+```
+
+**Stock status values:**
+
+| Value | Meaning |
+|---|---|
+| `ok` | Quantity is above the low-stock threshold (or no threshold set) |
+| `low` | Quantity is at or below the low-stock threshold |
+| `out` | Quantity is zero or negative |
+
+**Errors:**
+- `404` — Store not found in the current org, or no active layout version exists for the store.
 
 ---
 

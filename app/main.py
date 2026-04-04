@@ -25,6 +25,7 @@ from app.fixtures.routes import router as fixtures_router
 from app.stores.routes import router as stores_router
 from app.suppliers.routes import router as suppliers_router
 from app.store_inventory.routes import router as store_inventory_router
+from app.analytics.routes import router as analytics_router
 
 # ── Structured JSON logging to stdout → Docker → CloudWatch ──
 handler = logging.StreamHandler(sys.stdout)
@@ -91,6 +92,7 @@ def create_app() -> FastAPI:
     app.include_router(layouts_router)
     app.include_router(zones_router)
     app.include_router(fixtures_router)
+    app.include_router(analytics_router)
 
     return app
 
