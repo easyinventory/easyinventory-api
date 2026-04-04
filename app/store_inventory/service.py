@@ -282,7 +282,7 @@ async def record_receipt(
     inventory.quantity += data.quantity
 
     await db.flush()
-    await db.refresh(movement)
+    await db.refresh(movement, attribute_names=["zone"])
     return movement
 
 
@@ -337,7 +337,7 @@ async def record_sale(
     inventory.quantity -= data.quantity
 
     await db.flush()
-    await db.refresh(movement)
+    await db.refresh(movement, attribute_names=["zone"])
     return movement
 
 
