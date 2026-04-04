@@ -56,7 +56,7 @@ async def test_create_layout_version_returns_201(
     assert body["rows"] == 10
     assert body["cols"] == 8
     assert body["version_number"] == 1
-    assert body["is_active"] is False
+    assert body["is_active"] is True
     assert body["store_id"] == str(store.id)
     assert body["zones"] == []
 
@@ -354,3 +354,90 @@ async def test_list_layout_versions_scoped_to_store(
     assert response.status_code == 200
     ids = [v["id"] for v in response.json()]
     assert ids == [str(target.id)]
+
+
+# ── Auto-activation of first layout ──────────────────────────────────────────
+
+
+@pytest.mark.usefixtures("bypass_auth")
+async def test_first_layout_auto_activated_via_api(
+    client: AsyncClient,
+    db: AsyncSession,
+    test_user: User,
+) -> None:
+    """The first layout created via POST is automatically activated."""
+    org = await create_org(db)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
+    store = await create_store(db, org_id=org.id)
+
+    response = await client.post(
+        f"/api/stores/{store.id}/layouts",
+        json={"rows": 5, "cols": 5},
+        headers=_org_headers(org.id),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["is_active"] is True
+
+
+@pytest.mark.usefixtures("bypass_auth")
+async def test_second_layout_not_auto_activated_via_api(
+    client: AsyncClient,
+    db: AsyncSession,
+    test_user: User,
+) -> None:
+    """The second layout created via POST is NOT automatically activated."""
+    org = await create_org(db)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
+    store = await create_store(db, org_id=org.id)
+
+    # First layout — auto-activated
+    first = await client.post(
+        f"/api/stores/{store.id}/layouts",
+        json={"rows": 5, "cols": 5},
+        headers=_org_headers(org.id),
+    )
+    assert first.json()["is_active"] is True
+
+    # Second layout — should NOT be auto-activated
+    second = await client.post(
+        f"/api/stores/{store.id}/layouts",
+        json={"rows": 6, "cols": 6},
+        headers=_org_headers(org.id),
+    )
+    assert second.status_code == 201
+    assert second.json()["is_active"] is False
+
+
+@pytest.mark.usefixtures("bypass_auth")
+async def test_first_layout_retrievable_as_active(
+    client: AsyncClient,
+    db: AsyncSession,
+    test_user: User,
+) -> None:
+    """After creating the first layout, GET .../active returns it."""
+    org = await create_org(db)
+    await create_membership(
+        db, org_id=org.id, user_id=test_user.id, org_role=OrgRole.OWNER
+    )
+    store = await create_store(db, org_id=org.id)
+
+    create_resp = await client.post(
+        f"/api/stores/{store.id}/layouts",
+        json={"rows": 5, "cols": 5},
+        headers=_org_headers(org.id),
+    )
+    layout_id = create_resp.json()["id"]
+
+    active_resp = await client.get(
+        f"/api/stores/{store.id}/layouts/active",
+        headers=_org_headers(org.id),
+    )
+
+    assert active_resp.status_code == 200
+    assert active_resp.json()["id"] == layout_id
+    assert active_resp.json()["is_active"] is True

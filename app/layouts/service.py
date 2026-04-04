@@ -18,7 +18,10 @@ async def create_layout_version(
     rows: int,
     cols: int,
 ) -> LayoutVersion:
-    """Create a new layout version with an auto-incremented version_number."""
+    """Create a new layout version with an auto-incremented version_number.
+
+    The first layout created for a store is automatically activated.
+    """
     # Compute next version_number as MAX(version_number) + 1, starting at 1
     subq = select(func.coalesce(func.max(LayoutVersion.version_number), 0) + 1).where(
         LayoutVersion.store_id == store_id
@@ -26,12 +29,15 @@ async def create_layout_version(
     result = await db.execute(subq)
     next_version = result.scalar_one()
 
+    # Auto-activate if this is the first layout for the store
+    is_first = next_version == 1
+
     layout = LayoutVersion(
         store_id=store_id,
         version_number=next_version,
         rows=rows,
         cols=cols,
-        is_active=False,
+        is_active=is_first,
     )
     db.add(layout)
     await db.flush()
