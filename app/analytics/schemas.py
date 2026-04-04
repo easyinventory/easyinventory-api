@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 # ── Shared cell schema ────────────────────────────────────────────────────────
 
@@ -40,7 +41,7 @@ class ZoneInventoryItem(BaseModel):
     category: str | None = None
     quantity: float
     low_stock_threshold: float | None = None
-    unit_price: str | None = None
+    unit_price: Decimal | None = None
     stock_status: StockStatus
 
 
@@ -57,6 +58,7 @@ class ZoneInventorySummary(BaseModel):
     out_of_stock_count: int = 0
     items: list[ZoneInventoryItem] = Field(default_factory=list)
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def health_ratio(self) -> float:
         """0.0 = all healthy, 1.0 = all items have stock issues.

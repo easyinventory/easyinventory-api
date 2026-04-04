@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import NotFound
-from app.models.fixture import Fixture
 from app.models.inventory_placement import InventoryPlacement
 from app.models.layout_version import LayoutVersion
 from app.models.store_inventory import StoreInventory
@@ -120,7 +119,7 @@ async def get_zone_inventory_summary(
                     category=inv.product.category,
                     quantity=inv.quantity,
                     low_stock_threshold=inv.low_stock_threshold,
-                    unit_price=str(inv.unit_price) if inv.unit_price else None,
+                    unit_price=inv.unit_price,
                     stock_status=status,
                 )
             )
