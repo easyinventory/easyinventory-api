@@ -51,7 +51,9 @@ class TestZoneInventorySummaryRoute:
         """Endpoint returns 200 when service succeeds."""
         with (
             patch("app.analytics.routes.get_store_from_path") as mock_store_dep,
-            patch("app.analytics.routes.service.get_zone_inventory_summary") as mock_svc,
+            patch(
+                "app.analytics.routes.service.get_zone_inventory_summary"
+            ) as mock_svc,
             patch("app.auth.deps.get_current_user"),
             patch("app.orgs.deps.get_current_org_membership"),
         ):

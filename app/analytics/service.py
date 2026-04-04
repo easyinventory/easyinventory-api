@@ -26,7 +26,7 @@ from app.analytics.schemas import (
 )
 
 
-def _classify_stock(quantity: int, threshold: int | None) -> StockStatus:
+def _classify_stock(quantity: float, threshold: float | None) -> StockStatus:
     """Determine stock health status for a single inventory item."""
     if quantity <= 0:
         return StockStatus.OUT
@@ -102,7 +102,7 @@ async def get_zone_inventory_summary(
         zone_inv_items: list[ZoneInventoryItem] = []
         low_count = 0
         out_count = 0
-        total_qty = 0
+        total_qty: float = 0
 
         for inv in items:
             status = _classify_stock(inv.quantity, inv.low_stock_threshold)
@@ -143,8 +143,12 @@ async def get_zone_inventory_summary(
     fixture_summaries: list[FixtureSummary] = [
         FixtureSummary(
             fixture_id=f.id,
-            fixture_name=f.name,
-            fixture_type=f.fixture_type.value if hasattr(f.fixture_type, "value") else str(f.fixture_type),
+            fixture_name=f.name or f.fixture_type.value,
+            fixture_type=(
+                f.fixture_type.value
+                if hasattr(f.fixture_type, "value")
+                else str(f.fixture_type)
+            ),
             cells=[CellSchema(row=c["row"], col=c["col"]) for c in f.cells],
         )
         for f in layout.fixtures
@@ -153,7 +157,7 @@ async def get_zone_inventory_summary(
     # ── 6. Build unzoned summary ──────────────────────────────────────────
     unzoned_low = 0
     unzoned_out = 0
-    unzoned_qty = 0
+    unzoned_qty: float = 0
     for inv in unzoned_items:
         status = _classify_stock(inv.quantity, inv.low_stock_threshold)
         if status == StockStatus.LOW:

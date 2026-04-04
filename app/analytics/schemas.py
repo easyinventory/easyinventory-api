@@ -7,7 +7,6 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-
 # ── Shared cell schema ────────────────────────────────────────────────────────
 
 
@@ -39,8 +38,8 @@ class ZoneInventoryItem(BaseModel):
     product_name: str
     sku: str | None = None
     category: str | None = None
-    quantity: int
-    low_stock_threshold: int | None = None
+    quantity: float
+    low_stock_threshold: float | None = None
     unit_price: str | None = None
     stock_status: StockStatus
 
@@ -53,7 +52,7 @@ class ZoneInventorySummary(BaseModel):
     zone_color: str
     cells: list[CellSchema]
     total_items: int = 0
-    total_quantity: int = 0
+    total_quantity: float = 0
     low_stock_count: int = 0
     out_of_stock_count: int = 0
     items: list[ZoneInventoryItem] = Field(default_factory=list)
@@ -82,7 +81,7 @@ class UnzonedSummary(BaseModel):
     """Aggregate for inventory items not assigned to any zone."""
 
     total_items: int = 0
-    total_quantity: int = 0
+    total_quantity: float = 0
     low_stock_count: int = 0
     out_of_stock_count: int = 0
 

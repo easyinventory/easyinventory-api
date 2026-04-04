@@ -10,7 +10,6 @@ import pytest
 from app.analytics.schemas import StockStatus
 from app.analytics.service import _classify_stock, get_zone_inventory_summary
 
-
 # ── _classify_stock tests ─────────────────────────────────────────────────────
 
 
