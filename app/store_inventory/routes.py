@@ -79,8 +79,7 @@ async def get_store_inventory(
         description="Case-insensitive partial match on product category.",
     ),
     page: int = Query(default=1, ge=1, description="1-based page number."),
-    page_size: int = Query(default=20, ge=1, le=100, description="Items per page."),
-    paginated: bool = Query(default=True, description="is the page paginated."),
+    page_size: int = Query(default=20, ge=1, le=100000, description="Items per page."),
 ) -> PaginatedInventoryResponse:
     """List inventory entries for this store with optional search, category filter, and pagination."""
     items, total = await list_inventory(
@@ -97,6 +96,7 @@ async def get_store_inventory(
         page=page,
         page_size=page_size,
     )
+    
 
 
 @router.get("/{entry_id}", response_model=StoreInventoryRead)
