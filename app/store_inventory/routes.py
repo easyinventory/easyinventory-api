@@ -80,6 +80,7 @@ async def get_store_inventory(
     ),
     page: int = Query(default=1, ge=1, description="1-based page number."),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page."),
+    paginated: bool = Query(default=True, description="is the page paginated."),
 ) -> PaginatedInventoryResponse:
     """List inventory entries for this store with optional search, category filter, and pagination."""
     items, total = await list_inventory(
